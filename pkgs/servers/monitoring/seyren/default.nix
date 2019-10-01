@@ -1,20 +1,20 @@
 { stdenv, fetchurl, makeWrapper, jre }:
 
 stdenv.mkDerivation rec {
-  name = "seyren-${version}";
-  version = "1.0.0";
+  pname = "seyren";
+  version = "1.1.0";
 
   src = fetchurl {
     url = "https://github.com/scobal/seyren/releases/download/${version}/seyren-${version}.jar";
-    sha256 = "14p97yzfyacvavfms8qs3q5515vpfkjlfvislbwrf7qa89xzz8x0";
+    sha256 = "10m64zdci4swlvivii1jnmrwfi461af3xvn0xvwvy7i8kyb56vrr";
   };
 
   phases = ["installPhase"];
 
-  buildInputs = [ makeWrapper jre src ];
+  buildInputs = [ makeWrapper jre ];
 
   installPhase = ''
-    ensureDir "$out"/bin
+    mkdir -p "$out"/bin
     makeWrapper "${jre}/bin/java" "$out"/bin/seyren --add-flags "-jar $src"
   '';
 

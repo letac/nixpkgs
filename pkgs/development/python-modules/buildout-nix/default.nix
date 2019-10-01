@@ -1,11 +1,12 @@
-{ fetchurl, stdenv, buildPythonPackage }:
+{ fetchPypi, stdenv, buildPythonPackage }:
 
-buildPythonPackage {
-  name = "zc.buildout-nix-2.2.1";
+buildPythonPackage rec {
+  pname = "zc.buildout";
+  version = "2.13.1";
 
-  src = fetchurl {
-    url = "https://pypi.python.org/packages/source/z/zc.buildout/zc.buildout-2.2.1.tar.gz";
-    md5 = "476a06eed08506925c700109119b6e41";
+  src = fetchPypi {
+    inherit pname version;
+    sha256 = "3d14d07226963a517295dfad5879d2799e2e3b65b2c61c71b53cb80f5ab11484";
   };
 
   patches = [ ./nix.patch ];
@@ -13,9 +14,9 @@ buildPythonPackage {
   postInstall = "mv $out/bin/buildout{,-nix}";
 
   meta = {
-    homepage = "http://www.buildout.org";
+    homepage = http://www.buildout.org;
     description = "A software build and configuration system";
-    license = stdenv.lib.licenses.zpt21;
+    license = stdenv.lib.licenses.zpl21;
     maintainers = [ stdenv.lib.maintainers.goibhniu ];
   };
 }

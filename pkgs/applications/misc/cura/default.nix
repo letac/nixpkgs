@@ -1,71 +1,63 @@
-{ stdenv, python27Packages, curaengine, makeDesktopItem, fetchgit }:
-let
-    py = python27Packages;
-in
-stdenv.mkDerivation rec {
-  name = "cura";
+{ mkDerivation, lib, fetchFromGitHub, cmake, python3, qtbase, qtquickcontrols2, qtgraphicaleffects, curaengine, plugins ? [] }:
 
-  src = fetchgit {
-    url = "https://github.com/daid/Cura";
-    rev = "58414695269d60ca9b165e8cbc3424933ed79403";
-    sha256 = "1nxrrz8sjjx9i9cyvz15vay6yarnywp3vlk7qzr65sw88lzxgq23";
-    fetchSubmodules = false;
+mkDerivation rec {
+  pname = "cura";
+  version = "4.3.0";
+
+  src = fetchFromGitHub {
+    owner = "Ultimaker";
+    repo = "Cura";
+    rev = version;
+    sha256 = "1qnai8vmgy5lx3lapw96j41i8mw9p6r99i3qzs709l9yzrix6l86";
   };
 
-  desktopItem = makeDesktopItem {
-    name = "Cura";
-    exec = "cura";
-    icon = "cura";
-    comment = "Cura";
-    desktopName = "Cura";
-    genericName = "3D printing host software";
-    categories = "GNOME;GTK;Utility;";
+  materials = fetchFromGitHub {
+    owner = "Ultimaker";
+    repo = "fdm_materials";
+    rev = version;
+    sha256 = "141cv1f2pv2pznhgj32zg8bw3kmw9002g6rx16jq7lhclr0x3xls";
   };
 
-  python_deps = [ py.pyopengl py.pyserial py.numpy py.wxPython30 py.power py.setuptools ];
+  buildInputs = [ qtbase qtquickcontrols2 qtgraphicaleffects ];
+  propagatedBuildInputs = with python3.pkgs; [
+    libsavitar numpy-stl pyserial requests uranium zeroconf
+  ] ++ plugins;
+  nativeBuildInputs = [ cmake python3.pkgs.wrapPython ];
 
-  pythonPath = python_deps;
+  cmakeFlags = [
+    "-DURANIUM_DIR=${python3.pkgs.uranium.src}"
+    "-DCURA_VERSION=${version}"
+  ];
 
-  propagatedBuildInputs = python_deps;
+  makeWrapperArgs = [
+    # hacky workaround for https://github.com/NixOS/nixpkgs/issues/59901
+    "--set OMP_NUM_THREADS 1"
+  ];
 
-  buildInputs = [ curaengine py.wrapPython ];
-
-  configurePhase = "";
-  buildPhase = "";
-
-  installPhase = ''
-    # Install Python code.
-    site_packages=$out/lib/python2.7/site-packages
-    mkdir -p $site_packages
-    cp -r Cura $site_packages/
-
-    # Install resources.
-    resources=$out/share/cura
-    mkdir -p $resources
-    cp -r resources/* $resources/
-    sed -i 's|os.path.join(os.path.dirname(__file__), "../../resources")|"'$resources'"|g' $site_packages/Cura/util/resources.py
-
-    # Install executable.
-    mkdir -p $out/bin
-    cp Cura/cura.py $out/bin/cura
-    chmod +x $out/bin/cura
-    sed -i 's|#!/usr/bin/python|#!/usr/bin/env python|' $out/bin/cura
-    wrapPythonPrograms
-
-    # Make it find CuraEngine.
-    echo "def getEngineFilename(): return '${curaengine}/bin/CuraEngine'" >> $site_packages/Cura/util/sliceEngine.py
-
-    # Install desktop item.
-    mkdir -p "$out"/share/applications
-    cp "$desktopItem"/share/applications/* "$out"/share/applications/
-    mkdir -p "$out"/share/icons
-    ln -s "$resources/images/c.png" "$out"/share/icons/cura.png
+  postPatch = ''
+    sed -i 's,/python''${PYTHON_VERSION_MAJOR}/dist-packages,/python''${PYTHON_VERSION_MAJOR}.''${PYTHON_VERSION_MINOR}/site-packages,g' CMakeLists.txt
+    sed -i 's, executable_name = .*, executable_name = "${curaengine}/bin/CuraEngine",' plugins/CuraEngineBackend/CuraEngineBackend.py
   '';
 
-  meta = with stdenv.lib; {
-    description = "3D printing host software";
-    homepage = https://github.com/daid/Cura;
-    license = licenses.agpl3;
+  postInstall = ''
+    mkdir -p $out/share/cura/resources/materials
+    cp ${materials}/*.fdm_material $out/share/cura/resources/materials/
+    mkdir -p $out/lib/cura/plugins
+    for plugin in ${toString plugins}; do
+      ln -s $plugin/lib/cura/plugins/* $out/lib/cura/plugins
+    done
+  '';
+
+  postFixup = ''
+    wrapPythonPrograms
+    wrapQtApp $out/bin/cura
+  '';
+
+  meta = with lib; {
+    description = "3D printer / slicing GUI built on top of the Uranium framework";
+    homepage = https://github.com/Ultimaker/Cura;
+    license = licenses.lgpl3Plus;
     platforms = platforms.linux;
+    maintainers = with maintainers; [ abbradar gebner ];
   };
 }

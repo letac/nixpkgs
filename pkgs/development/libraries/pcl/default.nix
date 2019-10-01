@@ -1,22 +1,34 @@
-{ stdenv, fetchurl, cmake, qhull, flann, boost, vtk, eigen, pkgconfig, qt4, libusb1 }:
+{ stdenv, fetchFromGitHub, cmake
+, qhull, flann, boost, vtk, eigen, pkgconfig, qtbase
+, libusb1, libpcap, libXt, libpng, Cocoa, AGL, OpenGL
+}:
 
-stdenv.mkDerivation {
-  name = "pcl-1.6.0";
+stdenv.mkDerivation rec {
+  name = "pcl-1.9.1";
 
-  buildInputs = [ cmake qhull flann boost vtk eigen pkgconfig qt4 libusb1 ];
-
-  src = fetchurl {
-    url = mirror://sourceforge/pointclouds/PCL-1.6.0-Source.tar.bz2;
-    sha256 = "0ip3djcjgynlr9vac6jlcw6kxhg2lm8fc0aqk747a6l0rqvllf1x";
+  src = fetchFromGitHub {
+    owner = "PointCloudLibrary";
+    repo = "pcl";
+    rev = name;
+    sha256 = "0g0am3bf14sadfw231l5nmf5d2g1p9i7yq12c6q8rl7nw501ny9j";
   };
 
   enableParallelBuilding = true;
 
+  nativeBuildInputs = [ pkgconfig cmake ];
+  buildInputs = [ qhull flann boost eigen libusb1 libpcap
+                  libpng vtk qtbase libXt ]
+    ++ stdenv.lib.optionals stdenv.isDarwin [ Cocoa AGL ];
+
+  cmakeFlags = stdenv.lib.optionals stdenv.isDarwin [
+    "-DOPENGL_INCLUDE_DIR=${OpenGL}/Library/Frameworks"
+  ];
+
   meta = {
     homepage = http://pointclouds.org/;
     description = "Open project for 2D/3D image and point cloud processing";
-    license = "BSD";
+    license = stdenv.lib.licenses.bsd3;
     maintainers = with stdenv.lib.maintainers; [viric];
-    platforms = with stdenv.lib.platforms; linux;
+    platforms = with stdenv.lib.platforms; linux ++ darwin;
   };
 }

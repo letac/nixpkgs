@@ -1,30 +1,21 @@
-{ fetchurl, stdenv }:
+{ stdenv, fetchurl, lzip
+}:
 
-stdenv.mkDerivation rec {
-  name = "ed-1.9";
+stdenv.mkDerivation (rec {
+  name = "ed-${version}";
+  version = "1.15";
 
   src = fetchurl {
-    url = "mirror://gnu/ed/${name}.tar.gz";
-    sha256 = "122syihsx2hwzj75mkf5a9ssiky2xby748kp4cc00wzhmp7p5cym";
+    url = "mirror://gnu/ed/${name}.tar.lz";
+    sha256 = "0x6ivy5k0d7dy5z9g8q8nipr89m4qbk2ink2898qq43smp08ji5d";
   };
 
-  /* FIXME: Tests currently fail on Darwin:
+  nativeBuildInputs = [ lzip ];
 
-       building test scripts for ed-1.5...
-       testing ed-1.5...
-       *** Output e1.o of script e1.ed is incorrect ***
-       *** Output r3.o of script r3.ed is incorrect ***
-       make: *** [check] Error 127
-
-    */
-  doCheck = !stdenv.isDarwin;
-
-  crossAttrs = {
-    compileFlags = [ "CC=${stdenv.cross.config}-gcc" ];
-  };
+  doCheck = true; # not cross;
 
   meta = {
-    description = "GNU ed, an implementation of the standard Unix editor";
+    description = "An implementation of the standard Unix editor";
 
     longDescription = ''
       GNU ed is a line-oriented text editor.  It is used to create,
@@ -37,10 +28,16 @@ stdenv.mkDerivation rec {
       full-screen editors such as GNU Emacs or GNU Moe.
     '';
 
-    license = "GPLv3+";
+    license = stdenv.lib.licenses.gpl3Plus;
 
-    homepage = http://www.gnu.org/software/ed/;
+    homepage = https://www.gnu.org/software/ed/;
 
     maintainers = [ ];
+    platforms = stdenv.lib.platforms.unix;
   };
-}
+} // stdenv.lib.optionalAttrs (stdenv.hostPlatform != stdenv.buildPlatform) {
+  # This may be moved above during a stdenv rebuild.
+  preConfigure = ''
+    configureFlagsArray+=("CC=$CC")
+  '';
+})

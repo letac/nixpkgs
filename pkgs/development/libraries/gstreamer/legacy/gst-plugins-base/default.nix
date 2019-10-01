@@ -1,6 +1,7 @@
-{ fetchurl, stdenv, pkgconfig, python, gstreamer, xlibs, alsaLib, cdparanoia
+{ fetchurl, stdenv, pkgconfig, gstreamer, xorg, alsaLib, cdparanoia
 , libogg, libtheora, libvorbis, freetype, pango, liboil, glib, cairo, orc
-, libintlOrEmpty
+, libintl
+, ApplicationServices
 , # Whether to build no plugins that have external dependencies
   # (except the ALSA plugin).
   minimalDeps ? false
@@ -18,31 +19,32 @@ stdenv.mkDerivation rec {
   };
 
   patchPhase = ''
-
     sed -i 's@/bin/echo@echo@g' configure
     sed -i -e 's/^   /\t/' docs/{libs,plugins}/Makefile.in
+
+    patch -p1 < ${./gcc-4.9.patch}
   '';
+
+  outputs = [ "out" "dev" ];
 
   # TODO : v4l, libvisual
   buildInputs =
-    [ pkgconfig glib cairo orc ]
+    [ pkgconfig glib cairo orc libintl ]
     # can't build alsaLib on darwin
     ++ stdenv.lib.optional (!stdenv.isDarwin) alsaLib
     ++ stdenv.lib.optionals (!minimalDeps)
-      [ xlibs.xlibs xlibs.libXv libogg libtheora libvorbis freetype pango
+      [ xorg.xlibsWrapper xorg.libXv libogg libtheora libvorbis freetype pango
         liboil ]
     # can't build cdparanoia on darwin
     ++ stdenv.lib.optional (!minimalDeps && !stdenv.isDarwin) cdparanoia
-    ++ libintlOrEmpty;
-
-  NIX_CFLAGS_COMPILE = stdenv.lib.optionalString stdenv.isDarwin "-lintl";
+    ++ stdenv.lib.optional stdenv.isDarwin ApplicationServices;
 
   propagatedBuildInputs = [ gstreamer ];
 
   postInstall = "rm -rf $out/share/gtk-doc";
 
   meta = with stdenv.lib; {
-    homepage    = http://gstreamer.freedesktop.org;
+    homepage    = https://gstreamer.freedesktop.org;
     description = "Base plug-ins for GStreamer";
     license     = licenses.lgpl2Plus;
     maintainers = with maintainers; [ lovek323 ];

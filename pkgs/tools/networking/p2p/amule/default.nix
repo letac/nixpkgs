@@ -1,55 +1,76 @@
 { monolithic ? true # build monolithic amule
-, daemon ? false # build amule daemon
+, enableDaemon ? false # build amule daemon
 , httpServer ? false # build web interface for the daemon
 , client ? false # build amule remote gui
-, fetchurl, stdenv, zlib, wxGTK, perl, cryptopp, libupnp, gettext, libpng ? null
-, pkgconfig, makeWrapper }:
+, fetchFromGitHub, fetchpatch, stdenv, lib, zlib, wxGTK, perl, cryptopp, libupnp, gettext, libpng ? null
+, autoreconfHook, pkgconfig, makeWrapper, libX11 ? null }:
 
 assert httpServer -> libpng != null;
-with stdenv;
-let
-  # Enable/Disable Feature
-  edf = enabled: flag: if enabled then "--enable-" + flag else "--disable-" + flag;
-in
-mkDerivation rec {
-  name = "aMule-2.3.1";
+assert client -> libX11 != null;
 
-  src = fetchurl {
-    url = "mirror://sourceforge/amule/${name}.tar.xz";
-    sha256 = "0hvpx3c005nvxsfand5bwfxxiq3mv0mpykajfm2lkygjh1rw2383";
+stdenv.mkDerivation rec {
+  pname = "amule";
+  version = "2.3.2";
+
+  src = fetchFromGitHub {
+    owner = "amule-project";
+    repo = "amule";
+    rev = version;
+    sha256 = "010wxm6g9f92x6fympj501zbnjka32rzbx0sk3a2y4zpih5d2nsn";
   };
 
-  buildInputs =
-    [ zlib wxGTK perl cryptopp libupnp gettext pkgconfig makeWrapper ]
-    ++ lib.optional httpServer libpng;
+  patches = [
+    (fetchpatch {
+      url = "https://patch-diff.githubusercontent.com/raw/amule-project/amule/pull/135.patch";
+      sha256 = "1n24r1j28083b8ipbnh1nf6i4j6vx59pdkfl1c0g6bb4psx9wvvi";
+      name = "libupnp_18.patch";
+    })
+  ];
 
-  patches = [ ./gcc47.patch ]; # from Gentoo
+  postPatch = ''
+    substituteInPlace src/libs/ec/file_generator.pl \
+      --replace /usr/bin/perl ${perl}/bin/perl
 
-  configureFlags = ''
-    --with-crypto-prefix=${cryptopp}
-    --disable-debug
-    --enable-optimize
-    ${edf monolithic "monolithic"}
-    ${edf daemon "amule-daemon"}
-    ${edf client "amule-gui"}
-    ${edf httpServer "webserver"}
+    # autotools expects these to be in the root
+    cp docs/{AUTHORS,README} .
+    cp docs/Changelog ./ChangeLog
+    cp docs/Changelog ./NEWS
   '';
 
-  postConfigure = ''
-    sed -i "src/libs/ec/file_generator.pl"     \
-        -es'|/usr/bin/perl|${perl}/bin/perl|g'
+  preAutoreconf = ''
+    pushd src/pixmaps/flags_xpm >/dev/null
+    ./makeflags.sh
+    popd >/dev/null
   '';
+
+  nativeBuildInputs = [ autoreconfHook gettext makeWrapper pkgconfig ];
+
+  buildInputs = [
+    zlib wxGTK perl cryptopp libupnp
+  ] ++ lib.optional httpServer libpng
+    ++ lib.optional client libX11;
+
+  enableParallelBuilding = true;
+
+  configureFlags = [
+    "--with-crypto-prefix=${cryptopp}"
+    "--disable-debug"
+    "--enable-optimize"
+    (lib.enableFeature monolithic   "monolithic")
+    (lib.enableFeature enableDaemon "amule-daemon")
+    (lib.enableFeature client       "amule-gui")
+    (lib.enableFeature httpServer   "webserver")
+  ];
 
   # aMule will try to `dlopen' libupnp and libixml, so help it
   # find them.
   postInstall = lib.optionalString monolithic ''
-    wrapProgram "$out/bin/amule" --prefix LD_LIBRARY_PATH ":" "${libupnp}/lib"
+    wrapProgram $out/bin/amule \
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ libupnp ]}
   '';
 
-  meta = {
-    homepage = http://amule.org/;
+  meta = with lib; {
     description = "Peer-to-peer client for the eD2K and Kademlia networks";
-
     longDescription = ''
       aMule is an eMule-like client for the eD2k and Kademlia
       networks, supporting multiple platforms.  Currently aMule
@@ -61,9 +82,9 @@ mkDerivation rec {
       applications.
     '';
 
-    license = "GPLv2+";
-
-    platforms = stdenv.lib.platforms.gnu;  # arbitrary choice
-    maintainers = [ stdenv.lib.maintainers.phreedom ];
+    homepage = "https://amule.org/";
+    license = licenses.gpl2Plus;
+    maintainers = with maintainers; [ phreedom ];
+    platforms = platforms.unix;
   };
 }

@@ -1,101 +1,181 @@
-/* moving all git tools into one attribute set because git is unlikely to be
- * referenced by other packages and you can get a fast overview.
-*/
-args: with args; with pkgs;
+/* All git-relates tools live here, in a separate attribute set so that users
+ * can get a fast overview over what's available.
+ */
+args @ {config, lib, pkgs}: with args; with pkgs;
 let
-  inherit (pkgs) stdenv fetchgit fetchurl subversion;
-
-  gitBase = lib.makeOverridable (import ./git) {
-    inherit fetchurl stdenv curl openssl zlib expat perl python gettext gnugrep
-      asciidoc xmlto docbook2x docbook_xsl docbook_xml_dtd_45 libxslt cpio tcl
-      tk makeWrapper subversionClient gzip;
-    texinfo = texinfo5;
-    svnSupport = false;		# for git-svn support
-    guiSupport = false;		# requires tcl/tk
-    sendEmailSupport = false;	# requires plenty of perl libraries
+  gitBase = callPackage ./git {
+    svnSupport = false;         # for git-svn support
+    guiSupport = false;         # requires tcl/tk
+    sendEmailSupport = false;   # requires plenty of perl libraries
     perlLibs = [perlPackages.LWP perlPackages.URI perlPackages.TermReadKey];
     smtpPerlLibs = [
-      perlPackages.NetSMTP perlPackages.NetSMTPSSL
+      perlPackages.libnet perlPackages.NetSMTPSSL
       perlPackages.IOSocketSSL perlPackages.NetSSLeay
-      perlPackages.MIMEBase64 perlPackages.AuthenSASL
-      perlPackages.DigestHMAC
+      perlPackages.AuthenSASL perlPackages.DigestHMAC
     ];
   };
 
-in
-rec {
+  self = rec {
+  # Try to keep this generally alphabetized
 
-  # support for bugzilla
-  gitBz = import ./git-bz {
-    inherit fetchgit stdenv makeWrapper python asciidoc xmlto # docbook2x docbook_xsl docbook_xml_dtd_45 libxslt
-      ;
-    inherit (pythonPackages) pysqlite;
-  };
+  bfg-repo-cleaner = callPackage ./bfg-repo-cleaner { };
+
+  bitbucket-server-cli = callPackage ./bitbucket-server-cli { };
+
+  darcsToGit = callPackage ./darcs-to-git { };
+
+  diff-so-fancy = callPackage ./diff-so-fancy { };
+
+  ghq = callPackage ./ghq { };
 
   git = appendToName "minimal" gitBase;
 
-  # Git with SVN support, but without GUI.
-  gitSVN = lowPrio (appendToName "with-svn" (gitBase.override {
-    svnSupport = true;
-  }));
+  git-absorb = callPackage ./git-absorb {
+    inherit (darwin.apple_sdk.frameworks) Security;
+  };
+
+  git-appraise = callPackage ./git-appraise {};
+
+  git-fame = callPackage ./git-fame {};
+
+  gita = python3Packages.callPackage ./gita {};
 
   # The full-featured Git.
   gitFull = gitBase.override {
     svnSupport = true;
     guiSupport = true;
     sendEmailSupport = !stdenv.isDarwin;
+    withLibsecret = !stdenv.isDarwin;
   };
 
-  gitAnnex = pkgs.haskellPackages.gitAnnex;
+  # Git with SVN support, but without GUI.
+  gitSVN = lowPrio (appendToName "with-svn" (gitBase.override {
+    svnSupport = true;
+  }));
 
-  qgit = import ./qgit {
-    inherit fetchurl stdenv;
-    inherit (xlibs) libXext libX11;
-    qt = qt4;
+  git-annex = pkgs.haskellPackages.git-annex;
+
+  git-annex-metadata-gui = libsForQt5.callPackage ./git-annex-metadata-gui {
+    inherit (python3Packages) buildPythonApplication pyqt5 git-annex-adapter;
   };
 
-  qgitGit = import ./qgit/qgit-git.nix {
-    inherit fetchurl sourceFromHead stdenv;
-    inherit (xlibs) libXext libX11;
-    qt = qt4;
+  git-annex-remote-b2 = callPackage ./git-annex-remote-b2 { };
+
+  git-annex-remote-dbx = callPackage ./git-annex-remote-dbx {
+    inherit (python3Packages)
+    buildPythonApplication
+    fetchPypi
+    dropbox
+    annexremote
+    humanfriendly;
   };
 
-  stgit = import ./stgit {
-    inherit fetchurl stdenv python git;
+  git-annex-remote-rclone = callPackage ./git-annex-remote-rclone { };
+
+  git-bug = callPackage ./git-bug { };
+
+  # support for bugzilla
+  git-bz = callPackage ./git-bz { };
+
+  git-codeowners = callPackage ./git-codeowners { };
+
+  git-cola = callPackage ./git-cola { };
+
+  git-crypt = callPackage ./git-crypt { };
+
+  git-dit = callPackage ./git-dit {
+    inherit (darwin.apple_sdk.frameworks) CoreFoundation Security;
   };
 
-  topGit = lib.makeOverridable (import ./topgit) {
-    inherit stdenv fetchurl;
+  git-extras = callPackage ./git-extras { };
+
+  git-gone = callPackage ./git-gone {
+    inherit (darwin.apple_sdk.frameworks) Security;
   };
 
-  tig = import ./tig {
-    inherit stdenv fetchurl ncurses asciidoc xmlto docbook_xsl docbook_xml_dtd_45 readline;
+  git-hub = callPackage ./git-hub { };
+
+  git-ignore = callPackage ./git-ignore { };
+
+  git-imerge = callPackage ./git-imerge { };
+
+  git-octopus = callPackage ./git-octopus { };
+
+  git-open = callPackage ./git-open { };
+
+  git-radar = callPackage ./git-radar { };
+
+  git-recent = callPackage ./git-recent {
+    utillinux = if stdenv.isLinux then utillinuxMinimal else utillinux;
   };
-
-  hub = import ./hub {
-    inherit (rubyLibs) rake;
-    inherit stdenv fetchurl groff makeWrapper;
-  };
-
-  gitFastExport = import ./fast-export {
-    inherit fetchgit stdenv mercurial coreutils git makeWrapper subversion;
-  };
-
-  git2cl = import ./git2cl {
-    inherit fetchgit stdenv perl;
-  };
-
-  svn2git = import ./svn2git {
-    inherit stdenv fetchurl ruby makeWrapper;
-    git = gitSVN;
-  };
-
-  svn2git_kde = callPackage ./svn2git-kde { };
-
-  darcsToGit = callPackage ./darcs-to-git { };
-
-  gitflow = callPackage ./gitflow { };
 
   git-remote-hg = callPackage ./git-remote-hg { };
 
-}
+  git-reparent = callPackage ./git-reparent { };
+
+  git-secret = callPackage ./git-secret { };
+
+  git-secrets = callPackage ./git-secrets { };
+
+  git-standup = callPackage ./git-standup { };
+
+  git-stree = callPackage ./git-stree { };
+
+  git-subrepo = callPackage ./git-subrepo { };
+
+  git-sync = callPackage ./git-sync { };
+
+  git-test = callPackage ./git-test { };
+
+  git2cl = callPackage ./git2cl { };
+
+  gitFastExport = callPackage ./fast-export { };
+
+  gitRemoteGcrypt = callPackage ./git-remote-gcrypt { };
+
+  gitflow = callPackage ./gitflow { };
+
+  gitstatus = callPackage ./gitstatus { };
+
+  grv = callPackage ./grv { };
+
+  hub = callPackage ./hub {
+    inherit (darwin) Security;
+  };
+
+  hubUnstable = throw "use gitAndTools.hub instead";
+
+  lab = callPackage ./lab { };
+
+  lefthook = callPackage ./lefthook { };
+
+  pre-commit = pkgs.python3Packages.toPythonApplication pkgs.python3Packages.pre-commit;
+
+  pass-git-helper = python3Packages.callPackage ./pass-git-helper { };
+
+  qgit = qt5.callPackage ./qgit { };
+
+  stgit = callPackage ./stgit {
+  };
+
+  subgit = callPackage ./subgit { };
+
+  svn2git = callPackage ./svn2git {
+    git = gitSVN;
+  };
+
+  svn-all-fast-export = libsForQt5.callPackage ./svn-all-fast-export { };
+
+  tig = callPackage ./tig { };
+
+  topGit = callPackage ./topgit { };
+
+  transcrypt = callPackage ./transcrypt { };
+
+} // lib.optionalAttrs (config.allowAliases or true) (with self; {
+  # aliases
+  gitAnnex = git-annex;
+  svn_all_fast_export = svn-all-fast-export;
+});
+in
+  self

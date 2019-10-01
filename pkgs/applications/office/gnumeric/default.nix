@@ -1,38 +1,51 @@
-{ stdenv, fetchurl, pkgconfig, intltool, perl, perlXMLParser
-, goffice, makeWrapper, gtk3, gnome_icon_theme
+{ stdenv, fetchurl, pkgconfig, intltool, perlPackages
+, goffice, gnome3, wrapGAppsHook, gtk3, bison, pythonPackages
+, itstool, autoreconfHook
 }:
 
-stdenv.mkDerivation rec {
-  name = "gnumeric-1.12.12";
+let
+  inherit (pythonPackages) python pygobject3;
+in stdenv.mkDerivation rec {
+  pname = "gnumeric";
+  version = "1.12.45"; # TODO next release: remove gamma patch and autoreconfHook
 
   src = fetchurl {
-    url = "mirror://gnome/sources/gnumeric/1.12/${name}.tar.xz";
-    sha256 = "096i9x6b4i6x24vc4lsxx8fg2n2pjs2jb6x3bkg3ppa2c60w1jq0";
+    url = "mirror://gnome/sources/${pname}/${stdenv.lib.versions.majorMinor version}/${pname}-${version}.tar.xz";
+    sha256 = "0c8dl1kvnj3g32qy3s92qpqpqfy0in59cx005gjvvzsflahav61h";
   };
 
-  preConfigure = ''sed -i 's/\(SUBDIRS.*\) doc/\1/' Makefile.in''; # fails when installing docs
+  patches = stdenv.lib.optional stdenv.isDarwin
+    # https://gitlab.gnome.org/GNOME/gnumeric/issues/402
+    (fetchurl {
+      name = "math-gamma.patch";
+      url = "https://gitlab.gnome.org/GNOME/gnumeric/uploads/cf8d162bc719de92e97d01cb0ba5b637/ppp";
+      sha256 = "17wiigs06qc86a1nghwcg3pcnpa28123jblgsxpy3j7drardgnlp";
+    });
 
-  configureFlags = "--disable-component";
+  configureFlags = [ "--disable-component" ];
 
-  # ToDo: optional libgda, python, introspection?
+  nativeBuildInputs = [ pkgconfig intltool bison itstool wrapGAppsHook ]
+    ++ stdenv.lib.optional stdenv.isDarwin autoreconfHook;
+
+  # ToDo: optional libgda, introspection?
   buildInputs = [
-    pkgconfig intltool perl perlXMLParser
-    goffice gtk3 makeWrapper
-  ];
+    goffice gtk3 gnome3.adwaita-icon-theme
+    python pygobject3
+  ] ++ (with perlPackages; [ perl XMLParser ]);
 
-  preFixup = ''
-    for f in "$out"/bin/gnumeric-*; do
-      wrapProgram $f \
-        --prefix XDG_DATA_DIRS : "$XDG_ICON_DIRS:$GSETTINGS_SCHEMAS_PATH"
-    done
-    rm $out/share/icons/hicolor/icon-theme.cache
-  '';
+  enableParallelBuilding = true;
+
+  passthru = {
+    updateScript = gnome3.updateScript {
+      packageName = pname;
+    };
+  };
 
   meta = with stdenv.lib; {
     description = "The GNOME Office Spreadsheet";
-    license = "GPLv2+";
+    license = stdenv.lib.licenses.gpl2Plus;
     homepage = http://projects.gnome.org/gnumeric/;
-    platforms = platforms.linux;
+    platforms = platforms.unix;
     maintainers = [ maintainers.vcunat ];
   };
 }

@@ -2,56 +2,59 @@
 , coreutils
 , patchelf
 , requireFile
+, callPackage
 , alsaLib
+, dbus
 , fontconfig
 , freetype
 , gcc
 , glib
-, libpng
 , ncurses
 , opencv
 , openssl
 , unixODBC
-, xlibs
+, xkeyboard_config
+, xorg
 , zlib
+, libxml2
+, libuuid
+, lang ? "en"
+, libGL
+, libGLU
 }:
 
 let
-  platform =
-    if stdenv.system == "i686-linux" || stdenv.system == "x86_64-linux" then
-      "Linux"
-    else
-      throw "Mathematica requires i686-linux or x86_64 linux";
+  l10n =
+    import ./l10ns.nix {
+      lib = stdenv.lib;
+      inherit requireFile lang;
+    };
 in
 stdenv.mkDerivation rec {
-
-  name = "mathematica-9.0.0";
-
-  src = requireFile rec {
-    name = "Mathematica_9.0.0_LINUX.sh";
-    message = '' 
-      This nix expression requires that Mathematica_9.0.0_LINUX.sh is
-      already part of the store. Find the file on your Mathematica CD
-      and add it to the nix store with nix-store --add-fixed sha256 <FILE>.
-    '';
-    sha256 = "106zfaplhwcfdl9rdgs25x83xra9zcny94gb22wncbfxvrsk3a4q";
-  };
+  inherit (l10n) version name src;
 
   buildInputs = [
     coreutils
     patchelf
     alsaLib
     coreutils
+    dbus
     fontconfig
     freetype
-    gcc.gcc
+    gcc.cc
     gcc.libc
     glib
     ncurses
     opencv
     openssl
     unixODBC
-  ] ++ (with xlibs; [
+    xkeyboard_config
+    libxml2
+    libuuid
+    zlib
+    libGL
+    libGLU
+  ] ++ (with xorg; [
     libX11
     libXext
     libXtst
@@ -59,13 +62,16 @@ stdenv.mkDerivation rec {
     libXmu
     libXrender
     libxcb
+    libXcursor
+    libXfixes
+    libXrandr
+    libICE
+    libSM
   ]);
 
   ldpath = stdenv.lib.makeLibraryPath buildInputs
-    + stdenv.lib.optionalString (stdenv.system == "x86_64-linux")
-      (":" + stdenv.lib.makeSearchPath "lib64" buildInputs);
-
-  phases = "unpackPhase installPhase fixupPhase";
+    + stdenv.lib.optionalString (stdenv.hostPlatform.system == "x86_64-linux")
+      (":" + stdenv.lib.makeSearchPathOutput "lib" "lib64" buildInputs);
 
   unpackPhase = ''
     echo "=== Extracting makeself archive ==="
@@ -79,24 +85,40 @@ stdenv.mkDerivation rec {
     cd Installer
     # don't restrict PATH, that has already been done
     sed -i -e 's/^PATH=/# PATH=/' MathInstaller
+    sed -i -e 's/\/bin\/bash/\/bin\/sh/' MathInstaller
 
     echo "=== Running MathInstaller ==="
-    ./MathInstaller -auto -createdir=y -execdir=$out/bin -targetdir=$out/libexec/Mathematica -platforms=${platform} -silent
+    ./MathInstaller -auto -createdir=y -execdir=$out/bin -targetdir=$out/libexec/Mathematica -silent
+
+    # Fix library paths
+    cd $out/libexec/Mathematica/Executables
+    for path in mathematica MathKernel Mathematica WolframKernel wolfram math; do
+      sed -i -e 's#export LD_LIBRARY_PATH$#export LD_LIBRARY_PATH=${zlib}/lib:\''${LD_LIBRARY_PATH}#' $path
+    done
+
+    # Fix xkeyboard config path for Qt
+    for path in mathematica Mathematica; do
+      sed -i -e "2iexport QT_XKB_CONFIG_ROOT=\"${xkeyboard_config}/share/X11/xkb\"\n" $path
+    done
   '';
 
   preFixup = ''
     echo "=== PatchElfing away ==="
-    find $out/libexec/Mathematica/SystemFiles -type f -perm +100 | while read f; do
+    # This code should be a bit forgiving of errors, unfortunately
+    set +e
+    find $out/libexec/Mathematica/SystemFiles -type f -perm -0100 | while read f; do
       type=$(readelf -h "$f" 2>/dev/null | grep 'Type:' | sed -e 's/ *Type: *\([A-Z]*\) (.*/\1/')
       if [ -z "$type" ]; then
         :
       elif [ "$type" == "EXEC" ]; then
         echo "patching $f executable <<"
-        patchelf \
-            --set-interpreter "$(cat $NIX_GCC/nix-support/dynamic-linker)" \
-            --set-rpath "${ldpath}" \
-            "$f"
         patchelf --shrink-rpath "$f"
+        patchelf \
+	  --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+          --set-rpath "$(patchelf --print-rpath "$f"):${ldpath}" \
+          "$f" \
+          && patchelf --shrink-rpath "$f" \
+          || echo unable to patch ... ignoring 1>&2
       elif [ "$type" == "DYN" ]; then
         echo "patching $f library <<"
         patchelf \
@@ -110,15 +132,19 @@ stdenv.mkDerivation rec {
     done
   '';
 
+  dontBuild = true;
+
   # all binaries are already stripped
   dontStrip = true;
 
   # we did this in prefixup already
   dontPatchELF = true;
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "Wolfram Mathematica computational software system";
-    homepage = "http://www.wolfram.com/mathematica/";
-    license = "unfree";
+    homepage = http://www.wolfram.com/mathematica/;
+    license = licenses.unfree;
+    maintainers = with maintainers; [ herberteuler ];
+    platforms = [ "x86_64-linux" ];
   };
 }

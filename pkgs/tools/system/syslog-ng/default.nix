@@ -1,24 +1,68 @@
-{ stdenv, fetchurl, eventlog, pkgconfig, glib, python, systemd, perl }:
+{ stdenv, fetchurl, openssl, libcap, curl, which
+, eventlog, pkgconfig, glib, python, systemd, perl
+, riemann_c_client, protobufc, pcre, libnet
+, json_c, libuuid, libivykis, mongoc, rabbitmq-c
+, libesmtp
+}:
 
-stdenv.mkDerivation {
-  name = "syslog-ng-3.5.4.1";
+let
+  pname = "syslog-ng";
+in
+
+stdenv.mkDerivation rec {
+  name = "${pname}-${version}";
+  version = "3.22.1";
 
   src = fetchurl {
-    url = "http://www.balabit.com/downloads/files?path=/syslog-ng/sources/3.5.4.1/source/syslog-ng_3.5.4.1.tar.gz";
-    sha256 = "0rkgrmnyx1x6m3jw5n49k7r1dcg79lxh900g74rgvd3j86g9dilj";
+    url = "https://github.com/balabit/${pname}/releases/download/${name}/${name}.tar.gz";
+    sha256 = "1j3l9pn3lf9w87vvwbnxk098gprbqzmfpfw1rch46mgsfqvl8mh6";
   };
 
-  buildInputs = [ eventlog pkgconfig glib python systemd perl ];
+  nativeBuildInputs = [ pkgconfig which ];
+
+  buildInputs = [
+    libcap
+    curl
+    openssl
+    eventlog
+    glib
+    perl
+    python
+    systemd
+    riemann_c_client
+    protobufc
+    pcre
+    libnet
+    json_c
+    libuuid
+    libivykis
+    mongoc
+    rabbitmq-c
+    libesmtp
+  ];
 
   configureFlags = [
+    "--enable-manpages"
     "--enable-dynamic-linking"
     "--enable-systemd"
+    "--enable-smtp"
+    "--with-ivykis=system"
+    "--with-librabbitmq-client=system"
+    "--with-mongoc=system"
+    "--with-jsonc=system"
+    "--with-systemd-journal=system"
     "--with-systemdsystemunitdir=$(out)/etc/systemd/system"
   ];
 
-  meta = {
-    homepage = "http://www.balabit.com/network-security/syslog-ng/";
+  outputs = [ "out" "man" ];
+
+  enableParallelBuilding = true;
+
+  meta = with stdenv.lib; {
+    homepage = https://www.balabit.com/network-security/syslog-ng/;
     description = "Next-generation syslogd with advanced networking and filtering capabilities";
-    license = "GPLv2";
+    license = licenses.gpl2;
+    maintainers = with maintainers; [ fpletz ];
+    platforms = platforms.linux;
   };
 }

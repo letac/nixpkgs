@@ -1,23 +1,41 @@
-{ stdenv, fetchurl, zlib }:
+{ stdenv, fetchurl, perl, zlib }:
 
 stdenv.mkDerivation rec {
-  name = "libzip-0.11.2";
-  
+  pname = "libzip";
+  version = "1.3.0";
+
   src = fetchurl {
-    url = "http://www.nih.at/libzip/${name}.tar.gz";
-    sha256 = "1mcqrz37vjrfr4gnss37z1m7xih9x9miq3mms78zf7wn7as1znw3";
+    url = "https://www.nih.at/libzip/${pname}-${version}.tar.gz";
+    sha256 = "1633dvjc08zwwhzqhnv62rjf1abx8y5njmm8y16ik9iwd07ka6d9";
   };
-  
+
+  postPatch = ''
+    patchShebangs test-driver
+    patchShebangs man/handle_links
+  '';
+
+  outputs = [ "out" "dev" ];
+
+  nativeBuildInputs = [ perl ];
   propagatedBuildInputs = [ zlib ];
+
+  preCheck = ''
+    # regress/runtests is a generated file
+    patchShebangs regress
+  '';
 
   # At least mysqlWorkbench cannot find zipconf.h; I think also openoffice
   # had this same problem.  This links it somewhere that mysqlworkbench looks.
   postInstall = ''
-    ( cd $out/include ; ln -s ../lib/libzip/include/zipconf.h zipconf.h )
+    mkdir -p $dev/lib
+    mv $out/lib/libzip $dev/lib/libzip
+    ( cd $dev/include ; ln -s ../lib/libzip/include/zipconf.h zipconf.h )
   '';
 
-  meta = {
-    homepage = http://www.nih.at/libzip;
+  meta = with stdenv.lib; {
+    homepage = https://www.nih.at/libzip;
     description = "A C library for reading, creating and modifying zip archives";
+    license = licenses.bsd3;
+    platforms = platforms.unix;
   };
 }

@@ -1,25 +1,40 @@
-{ stdenv, fetchurl, cmake, SDL, openal, zlib, libpng, python, libvorbis }:
-
-assert stdenv.gcc.libc != null;
+{ stdenv, fetchFromGitHub, cmake
+, freetype, SDL2, SDL2_mixer, openal, zlib, libpng, python, libvorbis
+, libiconv }:
 
 stdenv.mkDerivation rec {
-  name = "gemrb-0.8.0.1";
-  
-  src = fetchurl {
-    url = "mirror://sourceforge/gemrb/${name}.tar.gz";
-    sha256 = "0v9iypls4iawnfkc91hcdnmc4vyg3ix7v7lmw3knv73q145v0ksd";
+  pname = "gemrb";
+  version = "0.8.5";
+
+  src = fetchFromGitHub {
+    owner  = "gemrb";
+    repo   = "gemrb";
+    rev    = "v${version}";
+    sha256 = "0xkjsiawxz53rac26vqz9sfgva0syff8x8crabrpbpxgmbacih7a";
   };
 
-  buildInputs = [ cmake python openal SDL zlib libpng libvorbis ];
+  # TODO: make libpng, libvorbis, sdl_mixer, freetype, vlc, glew (and other gl reqs) optional
+  buildInputs = [ freetype python openal SDL2 SDL2_mixer zlib libpng libvorbis libiconv ];
 
-  # Necessary to find libdl.
-  CMAKE_LIBRARY_PATH = "${stdenv.gcc.libc}/lib";
+  nativeBuildInputs = [ cmake ];
 
-  # Can't have -werror because of the Vorbis header files.
-  cmakeFlags = "-DDISABLE_WERROR=ON -DCMAKE_VERBOSE_MAKEFILE=ON";
+  enableParallelBuilding = true;
 
-  meta = {
+  cmakeFlags = [
+    "-DLAYOUT=opt"
+  ];
+
+  meta = with stdenv.lib; {
     description = "A reimplementation of the Infinity Engine, used by games such as Baldur's Gate";
-    homepage = http://gemrb.sourceforge.net/;
+    longDescription = ''
+      GemRB (Game engine made with pre-Rendered Background) is a portable
+      open-source implementation of Bioware's Infinity Engine. It was written to
+      support pseudo-3D role playing games based on the Dungeons & Dragons
+      ruleset (Baldur's Gate and Icewind Dale series, Planescape: Torment).
+    '';
+    homepage = http://gemrb.org/;
+    license = licenses.gpl2;
+    maintainers = with maintainers; [ peterhoeg ];
+    platforms = platforms.all;
   };
 }

@@ -2,14 +2,15 @@
 
 
 let
-  version = "2.3.0";
+  version = "2.5.1";
 in
 stdenv.mkDerivation {
-  name = "rebar-${version}";
+  pname = "rebar";
+  inherit version;
 
   src = fetchurl {
     url = "https://github.com/rebar/rebar/archive/${version}.tar.gz";
-    sha256 = "0g23ib96lalpmynx39fprlw08ivgyb7i6c6a8jvgqwr9jmd0nj06";
+    sha256 = "1y9b0smw0g5q197xf4iklzmcf8ad6w52p6mwzpf7b0ib1nd89jw6";
   };
 
   buildInputs = [ erlang ];
@@ -21,7 +22,7 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    homepage = "https://github.com/rebar/rebar";
+    homepage = https://github.com/rebar/rebar;
     description = "Erlang build tool that makes it easy to compile and test Erlang applications, port drivers and releases";
 
     longDescription = ''
@@ -34,7 +35,8 @@ stdenv.mkDerivation {
       variety of locations (git, hg, etc).
       '';
 
-    platforms = stdenv.lib.platforms.linux;
+    platforms = stdenv.lib.platforms.unix;
     maintainers = [ stdenv.lib.maintainers.the-kenny ];
+    license = stdenv.lib.licenses.asl20;
   };
 }

@@ -1,19 +1,23 @@
-{ stdenv, fetchurl, glib, pkgconfig }:
+{ stdenv, fetchurl, glib, pkgconfig, libfm-extra }:
 
+let name = "menu-cache-1.1.0";
+in
 stdenv.mkDerivation {
-  name = "menu-cache-0.5.1";
+  inherit name;
   src = fetchurl {
-    url = "mirror://sourceforge/lxde/menu-cache-0.5.1.tar.gz";
-    sha256 = "08m1msgbl6j7j72cwcg18klb99jif8h1phkcnbplxkdf3w15irh8";
+    url = "mirror://sourceforge/lxde/${name}.tar.xz";
+    sha256 = "1iry4zlpppww8qai2cw4zid4081hh7fz8nzsp5lqyffbkm2yn0pd";
   };
 
-  buildInputs = [ glib pkgconfig ];
+  nativeBuildInputs = [ pkgconfig ];
+
+  buildInputs = [ glib libfm-extra ];
 
   meta = with stdenv.lib; {
-    homepage = "http://blog.lxde.org/?tag=menu-cache";
-    license = licenses.gpl2Plus;
     description = "Library to read freedesktop.org menu files";
+    homepage = https://blog.lxde.org/tag/menu-cache/;
+    license = licenses.gpl2Plus;
     maintainers = [ maintainers.ttuegel ];
-    platforms = platforms.linux;
+    platforms = platforms.linux ++ platforms.darwin;
   };
 }

@@ -1,23 +1,37 @@
-{ stdenv, fetchurl }:
+{ stdenv, fetchFromGitHub, cmake }:
 
 stdenv.mkDerivation rec {
-  name = "snappy-1.1.1";
-  
-  src = fetchurl {
-    url = "http://snappy.googlecode.com/files/${name}.tar.gz";
-    sha256 = "1czscb5i003jg1amw3g1fmasv8crr5g3d922800kll8b3fj097yp";
+  pname = "snappy";
+  version = "1.1.7";
+
+  src = fetchFromGitHub {
+    owner = "google";
+    repo = "snappy";
+    rev = version;
+    sha256 = "1x7r8sjmdqlqjz0xfiwdyrqpgaj5yrvrgb28ivgpvnxgar5qv6m2";
   };
 
-  # -DNDEBUG for speed
-  preConfigure = ''
-    configureFlagsArray=("CXXFLAGS=-DNDEBUG -O2")
+  patches = [ ./disable-benchmark.patch ];
+
+  outputs = [ "out" "dev" ];
+
+  nativeBuildInputs = [ cmake ];
+
+  cmakeFlags = [ "-DBUILD_SHARED_LIBS=ON" "-DCMAKE_SKIP_BUILD_RPATH=OFF" ];
+
+  postInstall = ''
+    substituteInPlace "$out"/lib/cmake/Snappy/SnappyTargets.cmake \
+      --replace 'INTERFACE_INCLUDE_DIRECTORIES "''${_IMPORT_PREFIX}/include"' 'INTERFACE_INCLUDE_DIRECTORIES "'$dev'"'
   '';
+
+  checkTarget = "test";
 
   doCheck = true;
 
-  meta = {
-    homepage = http://code.google.com/p/snappy/;
-    license = "BSD";
+  meta = with stdenv.lib; {
+    homepage = https://google.github.io/snappy/;
+    license = licenses.bsd3;
     description = "Compression/decompression library for very high speeds";
+    platforms = platforms.unix;
   };
 }

@@ -1,38 +1,34 @@
-{ stdenv, fetchurl, kernelHeaders, kernel, perl }:
+{ stdenv, fetchurl, linuxHeaders, perl }:
 
 let
-  version = "2.0.3";
-
   commonMakeFlags = [
     "prefix=$(out)"
     "SHLIBDIR=$(out)/lib"
   ];
 in
 
-stdenv.mkDerivation {
-  name = "klibc-${version}-${kernel.version}";
+stdenv.mkDerivation rec {
+  pname = "klibc";
+  version = "2.0.4";
 
   src = fetchurl {
     url = "mirror://kernel/linux/libs/klibc/2.0/klibc-${version}.tar.xz";
-    sha256 = "02035f2b230020de569d40605485121e0fe481ed33a93bdb8bf8c6ee2695fffa";
+    sha256 = "7f9a0850586def7cf4faeeb75e5d0f66e613674c524f6e77b0f4d93a26c801cb";
   };
 
   patches = [ ./no-reinstall-kernel-headers.patch ];
 
   nativeBuildInputs = [ perl ];
 
-  makeFlags = commonMakeFlags ++ [
-    "KLIBCARCH=${stdenv.platform.kernelArch}"
-    "KLIBCKERNELSRC=${kernelHeaders}"
-  ] ++ stdenv.lib.optional (stdenv.platform.kernelArch == "arm") "CONFIG_AEABI=y";
+  hardeningDisable = [ "format" "stackprotector" ];
 
-  crossAttrs = {
-    makeFlags = commonMakeFlags ++ [
-      "KLIBCARCH=${stdenv.cross.platform.kernelArch}"
-      "KLIBCKERNELSRC=${kernelHeaders.crossDrv}"
-      "CROSS_COMPILE=${stdenv.cross.config}-"
-    ] ++ stdenv.lib.optional (stdenv.cross.platform.kernelArch == "arm") "CONFIG_AEABI=y";
-  };
+  makeFlags = commonMakeFlags ++ [
+    "KLIBCARCH=${stdenv.hostPlatform.platform.kernelArch}"
+    "KLIBCKERNELSRC=${linuxHeaders}"
+  ] # TODO(@Ericson2314): We now can get the ABI from
+    # `stdenv.hostPlatform.parsed.abi`, is this still a good idea?
+    ++ stdenv.lib.optional (stdenv.hostPlatform.platform.kernelArch == "arm") "CONFIG_AEABI=y"
+    ++ stdenv.lib.optional (stdenv.hostPlatform != stdenv.buildPlatform) "CROSS_COMPILE=${stdenv.cc.targetPrefix}";
 
   # Install static binaries as well.
   postInstall = ''
@@ -41,8 +37,12 @@ stdenv.mkDerivation {
     cp $(find $(find . -name static) -type f ! -name "*.g" -a ! -name ".*") $dir/
     cp usr/dash/sh $dir/
 
-    for file in ${kernelHeaders}/include/*; do
+    for file in ${linuxHeaders}/include/*; do
       ln -sv $file $out/lib/klibc/include
     done
   '';
+
+  meta = {
+    platforms = [ "x86_64-linux" ];
+  };
 }

@@ -1,24 +1,32 @@
-{stdenv, fetchurl, openssl, libX11} :
+{stdenv, fetchFromGitHub, openssl, libX11, libgssglue, pkgconfig, autoreconfHook
+, enableCredssp ? (!stdenv.isDarwin)
+} :
 
 stdenv.mkDerivation (rec {
   pname = "rdesktop";
-  version = "1.8.1";
-  name = "${pname}-${version}";
+  version = "1.8.6";
 
-  src = fetchurl {
-    url = "mirror://sourceforge/${pname}/${name}.tar.gz";
-    sha256 = "0il248cdsxvwjsl4bswf27ld9r1a7d48jf6bycr86kf3i55q7k3n";
+  src = fetchFromGitHub {
+    owner = pname;
+    repo = pname;
+    rev = "v${version}";
+    sha256 = "02sbhnqbasa54c75c86qw9w9h9sxxbnldj7bjv2gvn18lmq5rm20";
   };
 
-  buildInputs = [openssl libX11];
+  nativeBuildInputs = [pkgconfig autoreconfHook];
+  buildInputs = [openssl libX11]
+    ++ stdenv.lib.optional enableCredssp libgssglue;
 
   configureFlags = [
-    "--with-openssl=${openssl}"
-    "--disable-credssp"
+    "--with-ipv6"
+    "--with-openssl=${openssl.dev}"
     "--disable-smartcard"
-  ];
+  ] ++ stdenv.lib.optional (!enableCredssp) "--disable-credssp";
 
   meta = {
-    description = "rdesktop is an open source client for Windows Terminal Services";
+    description = "Open source client for Windows Terminal Services";
+    homepage = http://www.rdesktop.org/;
+    platforms = stdenv.lib.platforms.linux ++ stdenv.lib.platforms.darwin;
+    license = stdenv.lib.licenses.gpl2;
   };
 })

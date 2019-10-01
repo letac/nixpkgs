@@ -1,11 +1,11 @@
 { stdenv, fetchurl, python3, texinfo, makeWrapper }:
 
-stdenv.mkDerivation rec {
-  name = "ponysay-3.0.1";
+stdenv.mkDerivation {
+  name = "ponysay-3.0.3";
 
   src = fetchurl {
-    url = "https://github.com/erkin/ponysay/archive/3.0.1.tar.gz";
-    sha256 = "ab281f43510263b2f42a1b0a9097ee7831b3e33a9034778ecb12ccb51f6915ee";
+    url = "https://github.com/erkin/ponysay/archive/3.0.3.tar.gz";
+    sha256 = "12mjabf5cpp5dgg63s19rlyq3dhhpzzy2sa439yncqzsk7rdg0n3";
   };
 
   buildInputs = [ python3 texinfo makeWrapper ];
@@ -26,8 +26,9 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Cowsay reimplemention for ponies";
-    homepage = http://terse.tk/ponysay/;
-    license = "GPLv3";
+    homepage = http://erkin.co/ponysay/;
+    license = stdenv.lib.licenses.gpl3;
     maintainers = with stdenv.lib.maintainers; [ bodil ];
+    platforms = with stdenv.lib.platforms; unix;
   };
 }

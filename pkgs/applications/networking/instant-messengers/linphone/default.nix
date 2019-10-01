@@ -1,32 +1,58 @@
-{ stdenv, fetchurl, intltool, pkgconfig, gtk, libglade, libosip, libexosip
-, speex, readline, mediastreamer, libsoup, udev, libnotify }:
+{ stdenv, intltool, pkgconfig, readline, openldap, cyrus_sasl, libupnp
+, zlib, libxml2, gtk2, libnotify, speex, ffmpeg, libX11, libsoup, udev
+, ortp, mediastreamer, sqlite, belle-sip, libosip, libexosip, bzrtp
+, mediastreamer-openh264, bctoolbox, makeWrapper, fetchFromGitHub, cmake
+, libmatroska, bcunit, doxygen, gdk-pixbuf, glib, cairo, pango, polarssl
+, python, graphviz, belcard
+, withGui ? true
+}:
 
 stdenv.mkDerivation rec {
-  name = "linphone-3.6.1";
+  baseName = "linphone";
+  version = "3.12.0";
+  name = "${baseName}-${version}";
 
-  src = fetchurl {
-    url = "mirror://savannah/linphone/3.6.x/sources/${name}.tar.gz";
-    sha256 = "186jm4nd4ggb0j8cs8wnpm4sy9cr7chq0c6kx2yc6y4k7qi83fh5";
+  src = fetchFromGitHub {
+    owner = "BelledonneCommunications";
+    repo = baseName;
+    rev = version;
+    sha256 = "0az2ywrpx11sqfb4s4r2v726avcjf4k15bvrqj7xvhz7hdndmh0j";
   };
 
-  buildInputs = [ gtk libglade libosip libexosip readline mediastreamer speex libsoup udev
-    libnotify ];
+  cmakeFlags = stdenv.lib.optional withGui [ "-DENABLE_GTK_UI=ON" ];
 
-  nativeBuildInputs = [ intltool pkgconfig ];
-
-  preConfigure = ''
-    rm -r mediastreamer2 oRTP
-    sed -i s,/bin/echo,echo, coreapi/Makefile*
+  postPatch = ''
+    touch coreapi/liblinphone_gitversion.h
   '';
 
-  configureFlags = "--enable-external-ortp --enable-external-mediastreamer";
+  buildInputs = [
+    readline openldap cyrus_sasl libupnp zlib libxml2 gtk2 libnotify speex ffmpeg libX11
+    polarssl libsoup udev ortp mediastreamer sqlite belle-sip libosip libexosip
+    bctoolbox libmatroska bcunit gdk-pixbuf glib cairo pango bzrtp belcard
+  ];
 
-  NIX_CFLAGS_COMPILE = "-Wno-error=deprecated-declarations"; # I'm lazy to fix these for them
+  nativeBuildInputs = [
+    intltool pkgconfig makeWrapper cmake doxygen graphviz
+    (python.withPackages (ps: [ ps.pystache ps.six ]))
+  ];
 
-  meta = {
+  NIX_CFLAGS_COMPILE = " -Wno-error -I${glib.dev}/include/glib-2.0
+    -I${glib.out}/lib/glib-2.0/include -I${gtk2.dev}/include/gtk-2.0/
+    -I${cairo.dev}/include/cairo -I${pango.dev}/include/pango-1.0
+    -I${gtk2}/lib/gtk-2.0/include
+    -DLIBLINPHONE_GIT_VERSION=\"v${version}\"
+    ";
+
+  postInstall = ''
+    for i in $(cd $out/bin && ls); do
+      wrapProgram $out/bin/$i --set MEDIASTREAMER_PLUGINS_DIR ${mediastreamer-openh264}/lib/mediastreamer/plugins
+    done
+  '';
+
+  meta = with stdenv.lib; {
     homepage = http://www.linphone.org/;
     description = "Open Source video SIP softphone";
-    license = "GPLv2+";
-    platforms = stdenv.lib.platforms.gnu;
+    license = licenses.gpl2Plus;
+    platforms = platforms.linux;
   };
 }

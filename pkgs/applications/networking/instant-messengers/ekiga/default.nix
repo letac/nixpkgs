@@ -1,71 +1,73 @@
-x@{builderDefsPackage
-  , cyrus_sasl, gettext, openldap, ptlib, opal, GConf, libXv, rarian, intltool
-  , perl, perlXMLParser, evolution_data_server, gnome_doc_utils, avahi
-  , libsigcxx, gtk, dbus_glib, libnotify, libXext, xextproto, automake
-  , autoconf, pkgconfig, libxml2, videoproto, unixODBC, db, nspr, nss, zlib
-  , libXrandr, randrproto, which, libxslt, libtasn1, gmp, nettle
-  , ...}:
-builderDefsPackage
-(a :  
-let 
-  helperArgNames = ["stdenv" "fetchurl" "builderDefsPackage"] ++ 
-    [];
+{ stdenv, glib, fetchurl, fetchpatch, cyrus_sasl, gettext, openldap, ptlib, opal, libXv, rarian, intltool
+, perlPackages, evolution-data-server, gnome-doc-utils, avahi, autoreconfHook
+, libsigcxx, gtk2, dbus-glib, libnotify, libXext, xorgproto, gnome3, boost, libsecret
+, pkgconfig, libxml2, unixODBC, db, nspr, nss, zlib
+, libXrandr, which, libxslt, libtasn1, gmp, nettle, sqlite, makeWrapper }:
 
-  buildInputs = map (n: builtins.getAttr n x)
-    (builtins.attrNames (builtins.removeAttrs x helperArgNames));
-  sourceInfo = rec {
-    baseName="ekiga";
-    baseVersion="3.2";
-    patchlevel="7";
-    version="${baseVersion}.${patchlevel}";
-    name="${baseName}-${version}";
-    url="mirror://gnome/sources/${baseName}/${baseVersion}/${name}.tar.bz2";
-    hash="13zxwfqhp7pisadx0hq50qwnj6d8r4dldvbs1ngydbwfnq4i6npj";
-  };
-in
-rec {
-  src = a.fetchurl {
-    url = sourceInfo.url;
-    sha256 = sourceInfo.hash;
+stdenv.mkDerivation rec {
+  pname = "ekiga";
+  version = "4.0.1";
+
+  src = fetchurl {
+    url = "mirror://gnome/sources/${pname}/${stdenv.lib.versions.majorMinor version}/${pname}-${version}.tar.xz";
+    sha256 = "5f4f491c9496cf65ba057a9345d6bb0278f4eca07bcda5baeecf50bfcd9a4a3b";
   };
 
-  inherit (sourceInfo) name version;
-  inherit buildInputs;
+  buildInputs = [ cyrus_sasl gettext openldap ptlib opal libXv rarian intltool
+                  evolution-data-server gnome-doc-utils avahi
+                  libsigcxx gtk2 dbus-glib libnotify libXext xorgproto sqlite
+                  gnome3.libsoup glib gnome3.adwaita-icon-theme boost
+                  autoreconfHook pkgconfig libxml2 unixODBC db nspr
+                  nss zlib libsecret libXrandr which libxslt libtasn1
+                  gmp nettle makeWrapper ]
+    ++ (with perlPackages; [ perl XMLParser ]);
 
-  /* doConfigure should be removed if not needed */
-  phaseNames = ["setVars" "doConfigure" "doMakeInstall"];
+  preAutoreconf = ''
+    substituteInPlace configure.ac --replace AM_GCONF_SOURCE_2 ""
+    substituteInPlace configure.ac --replace gnome-icon-theme adwaita-icon-theme
+  '';
+
   configureFlags = [
-    "--with-ldap-dir=${openldap}"
-    "--with-libsasl2-dir=${cyrus_sasl}"
+    "--with-ldap-dir=${openldap.dev}"
+    "--with-libsasl2-dir=${cyrus_sasl.dev}"
+    "--with-boost-libdir=${boost.out}/lib"
+    "--disable-gconf"
   ];
 
-  setVars = a.noDepEntry (''
-    export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -I${opal}/include/opal"
-    export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -I$(echo ${evolution_data_server}/include/evolution-*)"
-    export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -I${libxml2}/include/libxml2"
-    export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -I${GConf}/include/gconf/2"
+  enableParallelBuilding = true;
 
-    export NIX_LDFLAGS="$NIX_LDFLAGS -lopal"
-    for i in ${evolution_data_server}/lib/lib*.so; do
-      file="$(basename "$i" .so)"
-      bn="''${file#lib}"
-      export NIX_LDFLAGS="$NIX_LDFLAGS -l$bn"
-    done
-  '');
+  patches = [
+    (fetchpatch { url = https://sources.debian.net/data/main/e/ekiga/4.0.1-7/debian/patches/autofoo.patch;
+      sha256 = "1vyagslws4mm9yfz1m5p1kv9sxmk5lls9vxpm6j72q2ahsgydzx4";
+    })
+    (fetchpatch { url = https://sources.debian.net/data/main/e/ekiga/4.0.1-7/debian/patches/boost.patch;
+      sha256 = "01k0rw8ibrrf9zn9lx6dzbrgy58w089hqxqxqdv9whb65cldlj5s";
+    })
+    (fetchpatch { url = https://src.fedoraproject.org/rpms/ekiga/raw/dbf5f5ba449d22bd79f0394cddb7d4d8a88ec6ac/f/ekiga-4.0.1-libresolv.patch;
+      sha256 = "18wc68im8422ibpa0gkrkgjq41m7hikaha3xqmjs2km45i1cwcaz";
+    })
+  ];
 
-  meta = {
-    description = "Ekiga SIP client";
-    maintainers = with a.lib.maintainers;
-    [
-      raskin
-    ];
-    platforms = with a.lib.platforms;
-      linux;
-  };
+  postInstall = ''
+    wrapProgram "$out"/bin/ekiga \
+      --prefix XDG_DATA_DIRS : "$XDG_ICON_DIRS:$GSETTINGS_SCHEMAS_PATH"
+  '';
+
   passthru = {
     updateInfo = {
       downloadPage = "mirror://gnome/sources/ekiga";
     };
+    updateScript = gnome3.updateScript {
+      packageName = pname;
+    };
   };
-}) x
+
+  meta = with stdenv.lib; {
+    description = "VOIP/Videoconferencing app with full SIP and H.323 support";
+    homepage = "https://www.ekiga.org/";
+    maintainers = [ maintainers.raskin ];
+    platforms = platforms.linux;
+    license = licenses.gpl2Plus;
+  };
+}
 

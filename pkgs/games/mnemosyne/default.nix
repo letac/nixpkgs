@@ -1,33 +1,42 @@
-{ stdenv
-, fetchurl
-, buildPythonPackage
-, pyqt4
-, matplotlib
-, cherrypy
-, sqlite3
+{ fetchurl
+, python
 }:
-let 
-  version = "2.2.1";
-in buildPythonPackage rec {
-  name = "mnemosyne-${version}";
+
+python.pkgs.buildPythonApplication rec {
+  pname = "mnemosyne";
+  version = "2.6.1";
+
   src = fetchurl {
-    url    = "http://sourceforge.net/projects/mnemosyne-proj/files/mnemosyne/${name}/Mnemosyne-${version}.tar.gz";
-    sha256 = "7f5dd06a879b9ab059592355412182ee286e78e124aa25d588cacf9e4ab7c423";
+    url    = "mirror://sourceforge/project/mnemosyne-proj/mnemosyne/mnemosyne-${version}/Mnemosyne-${version}.tar.gz";
+    sha256 = "0xcwikq51abrlqfn5bv7kcw1ccd3ip0w6cjd5vnnzwnaqwdj8cb3";
   };
-  pythonPath = [
-    pyqt4
+
+  propagatedBuildInputs = with python.pkgs; [
+    pyqt5
     matplotlib
     cherrypy
-    sqlite3
+    cheroot
+    webob
+    pillow
   ];
-  preConfigure = ''
+
+  # No tests/ directrory in tarball
+  doCheck = false;
+
+  prePatch = ''
     substituteInPlace setup.py --replace /usr $out
     find . -type f -exec grep -H sys.exec_prefix {} ';' | cut -d: -f1 | xargs sed -i s,sys.exec_prefix,\"$out\",
   '';
-  installCommand = "python setup.py install --prefix=$out";
+
+  postInstall = ''
+    mkdir -p $out/share
+    mv $out/${python.sitePackages}/$out/share/locale $out/share
+    rm -r $out/${python.sitePackages}/nix
+  '';
+
   meta = {
-    homepage = "http://mnemosyne-proj.org/";
-    description = "Spaced-repetition software.";
+    homepage = https://mnemosyne-proj.org/;
+    description = "Spaced-repetition software";
     longDescription = ''
       The Mnemosyne Project has two aspects:
 
@@ -51,7 +60,7 @@ in buildPythonPackage rec {
       uploaded to a central server for analysis. This data will be valuable to
       study the behaviour of our memory over a very long time period. The
       results will be used to improve the scheduling algorithms behind the
-      software even further.  
+      software even further.
     '';
   };
 }

@@ -109,7 +109,7 @@ in
   # not be started by default on the installation CD because the
   # default root password is empty.
   services.openssh.enable = true;
-  jobs.openssh.startOn = lib.mkOverride 50 "";
+  systemd.services.openssh.wantedBy = lib.mkOverride 50 [];
 
   # To be able to use the systemTarball to catch troubles.
   boot.crashDump = {
@@ -129,7 +129,7 @@ in
   ];
 
   nixpkgs.config = {
-    packageOverrides = p: rec {
+    packageOverrides = p: {
       linux_3_4 = p.linux_3_4.override {
         extraConfig = ''
           # Enable drivers in kernel for most NICs.

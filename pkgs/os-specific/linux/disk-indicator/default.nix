@@ -1,12 +1,12 @@
 { stdenv, fetchgit, libX11 }:
 
 stdenv.mkDerivation {
-  name = "disk-indicator";
+  name = "disk-indicator-2014-05-19";
 
   src = fetchgit {
     url = git://github.com/MeanEYE/Disk-Indicator.git;
     rev = "51ef4afd8141b8d0659cbc7dc62189c56ae9c2da";
-    sha256 = "0f8mxl3wqlap8zajdk6r9liliayp8w4xs4jy8jbwanmmppwz0nb9";
+    sha256 = "10jx6mx9qarn21p2l2jayxkn1gmqhvck1wymgsr4jmbwxl8ra5kd";
   };
 
   buildInputs = [ libX11 ];
@@ -17,6 +17,10 @@ stdenv.mkDerivation {
   '';
 
   buildPhase = "make -f makefile";
+
+  NIX_CFLAGS_COMPILE = "-Wno-error=cpp";
+
+  hardeningDisable = [ "fortify" ];
 
   installPhase = ''
     mkdir -p "$out/bin"
@@ -30,7 +34,7 @@ stdenv.mkDerivation {
       Small program for Linux that will turn your Scroll, Caps or Num Lock LED
       or LED on your ThinkPad laptop into a hard disk activity indicator.
     '';
-    license = "GPLv3";
+    license = stdenv.lib.licenses.gpl3;
     platforms = stdenv.lib.platforms.linux;
   };
 }

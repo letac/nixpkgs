@@ -1,24 +1,27 @@
-{ stdenv, fetchurl }:
+{ stdenv, fetchurl, autoreconfHook }:
 
-let name = "libbsd-0.3.0";
-in stdenv.mkDerivation {
-  inherit name;
+stdenv.mkDerivation rec {
+  pname = "libbsd";
+  version = "0.9.1";
 
   src = fetchurl {
-    url = "http://libbsd.freedesktop.org/releases/${name}.tar.gz";
-    sha256 = "fbf36ed40443e1d0d795adbae8d461952509e610c3ccf0866ae160b723f7fe38";
+    url = "https://libbsd.freedesktop.org/releases/${pname}-${version}.tar.xz";
+    sha256 = "1957w2wi7iqar978qlfsm220dwywnrh5m58nrnn9zmi74ds3bn2n";
   };
 
-  patchPhase = ''
-    substituteInPlace Makefile \
-      --replace "/usr" "$out" \
-      --replace "{exec_prefix}" "{prefix}"
-  '';
+  # darwin changes configure.ac which means we need to regenerate
+  # the configure scripts
+  nativeBuildInputs = [ autoreconfHook ];
 
-  meta = { 
+  patches = stdenv.lib.optional stdenv.isDarwin ./darwin.patch
+    # Suitable for all but limited to musl to avoid rebuild
+    ++ stdenv.lib.optional stdenv.hostPlatform.isMusl ./musl.patch;
+
+  meta = with stdenv.lib; {
     description = "Common functions found on BSD systems";
-    homepage = http://libbsd.freedesktop.org/;
-    license = "BSD3";
+    homepage = https://libbsd.freedesktop.org/;
+    license = licenses.bsd3;
+    platforms = platforms.linux ++ platforms.darwin;
+    maintainers = with maintainers; [ matthewbauer ];
   };
 }
-

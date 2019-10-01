@@ -1,11 +1,25 @@
-{stdenv, fetchurl, x11}:
+{stdenv, lib, fetchFromGitHub, libX11, autoreconfHook }:
 
 stdenv.mkDerivation {
-  name = "xsel-1.2.0";
-  src = fetchurl {
-    url = http://www.vergenet.net/~conrad/software/xsel/download/xsel-1.2.0.tar.gz;
-    sha256 = "070lbcpw77j143jrbkh0y1v10ppn1jwmjf92800w7x42vh4cw9xr";
+  pname = "xsel-unstable";
+
+  version = "2018-01-10";
+
+  src = fetchFromGitHub {
+    owner = "kfish";
+    repo = "xsel";
+    rev = "9bfc13d64b5acb92c6648c696a9d9260fcbecc65";
+    sha256 = "05ms34by5hxznnpvmvhgp6llvlkz0zw4sq6c4bgwr82lj140lscm";
   };
 
-  buildInputs = [x11];
+  nativeBuildInputs = [ autoreconfHook ];
+  buildInputs = [ libX11 ];
+
+  meta = with lib; {
+    description = "Command-line program for getting and setting the contents of the X selection";
+    homepage = http://www.kfish.org/software/xsel;
+    license = licenses.mit;
+    maintainers = [ maintainers.cstrahan ];
+    platforms = lib.platforms.unix;
+  };
 }

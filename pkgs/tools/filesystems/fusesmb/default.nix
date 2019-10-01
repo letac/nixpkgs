@@ -16,9 +16,13 @@ stdenv.mkDerivation rec {
       ln -fs ${samba}/lib/libsmbclient.so $out/lib/libsmbclient.so.0
     '';
 
-  meta = {
+  hardeningDisable = [ "format" ];
+
+  meta = with stdenv.lib; {
     description = "Samba mounted via FUSE";
-    homepage = http://www.ricardis.tudelft.nl/~vincent/fusesmb/;
-    platforms = stdenv.lib.platforms.linux;
+    license = licenses.gpl2;
+    platforms = platforms.linux;
+    broken = true; # Needs vulnerable Samba, missing source link
+                   # 2018-08-21
   };
 }

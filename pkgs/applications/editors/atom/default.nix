@@ -1,68 +1,83 @@
-{ stdenv, fetchurl, buildEnv, makeDesktopItem, makeWrapper, zlib, glib, alsaLib
-, dbus, gtk, atk, pango, freetype, fontconfig, libgnome_keyring3, gdk_pixbuf
-, cairo, cups, expat, libgpgerror, nspr, gconf, nss, xlibs
-}:
+{ stdenv, pkgs, fetchurl, wrapGAppsHook, gvfs, gtk3, atomEnv }:
 
 let
-  atomEnv = buildEnv {
-    name = "env-atom";
-    paths = [
-      stdenv.gcc.gcc zlib glib dbus gtk atk pango freetype libgnome_keyring3
-      fontconfig gdk_pixbuf cairo cups expat libgpgerror alsaLib nspr gconf nss
-      xlibs.libXrender xlibs.libX11 xlibs.libXext xlibs.libXdamage xlibs.libXtst
-      xlibs.libXcomposite xlibs.libXi xlibs.libXfixes
+  versions = {
+    atom = {
+      version = "1.36.1";
+      sha256 = "1m7q2r3zx463k7kpqb364piqrr69wrhs033ibzxdx9y7r4204qp4";
+    };
+
+    atom-beta = {
+      version = "1.37.0";
+      beta = 0;
+      sha256 = "0aq8r5vfgq7r31qajjgcg4n5a57a2m8fvq6fzy9vq5gawkvmaxxx";
+    };
+  };
+
+  common = pname: {version, sha256, beta ? null}:
+      let fullVersion = version + stdenv.lib.optionalString (beta != null) "-beta${toString beta}";
+      name = "${pname}-${fullVersion}";
+  in stdenv.mkDerivation {
+    inherit name;
+    version = fullVersion;
+
+    src = fetchurl {
+      url = "https://github.com/atom/atom/releases/download/v${fullVersion}/atom-amd64.deb";
+      name = "${name}.deb";
+      inherit sha256;
+    };
+
+    nativeBuildInputs = [
+      wrapGAppsHook  # Fix error: GLib-GIO-ERROR **: No GSettings schemas are installed on the system
     ];
+
+    buildInputs = [
+      gtk3  # Fix error: GLib-GIO-ERROR **: Settings schema 'org.gtk.Settings.FileChooser' is not installed
+    ];
+
+    preFixup = ''
+      gappsWrapperArgs+=(
+        --prefix "PATH" : "${gvfs}/bin" \
+      )
+    '';
+
+    buildCommand = ''
+      mkdir -p $out/usr/
+      ar p $src data.tar.xz | tar -C $out -xJ ./usr
+      sed -i -e "s|Exec=.*$|Exec=$out/bin/${pname}|" $out/usr/share/applications/${pname}.desktop
+      mv $out/usr/* $out/
+      rm -r $out/share/lintian
+      rm -r $out/usr/
+      sed -i "s/${pname})/.${pname}-wrapped)/" $out/bin/${pname}
+
+      fixupPhase
+
+      share=$out/share/${pname}
+
+      patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+        --set-rpath "${atomEnv.libPath}:$share" \
+        $share/atom
+      patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+        --set-rpath "${atomEnv.libPath}" \
+        $share/resources/app/apm/bin/node
+      patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+        $share/resources/app.asar.unpacked/node_modules/symbols-view/vendor/ctags-linux
+
+      dugite=$share/resources/app.asar.unpacked/node_modules/dugite
+      rm -f $dugite/git/bin/git
+      ln -s ${pkgs.git}/bin/git $dugite/git/bin/git
+      rm -f $dugite/git/libexec/git-core/git
+      ln -s ${pkgs.git}/bin/git $dugite/git/libexec/git-core/git
+
+      find $share -name "*.node" -exec patchelf --set-rpath "${atomEnv.libPath}:$share" {} \;
+    '';
+
+    meta = with stdenv.lib; {
+      description = "A hackable text editor for the 21st Century";
+      homepage = https://atom.io/;
+      license = licenses.mit;
+      maintainers = with maintainers; [ offline nequissimus ysndr ];
+      platforms = platforms.x86_64;
+    };
   };
-in stdenv.mkDerivation rec {
-  name = "atom-${version}";
-  version = "0.99.0";
-
-  src = fetchurl {
-      url = https://github.com/hotice/webupd8/raw/master/atom-linux64-0.99.0~git20140525.tar.xz;
-      sha256 = "55c2415c96e1182ae1517751cbea1db64e9962683b384cfe5e182aec10aebecd";
-      name = "${name}.tar.xz";
-  };
-
-  iconsrc = fetchurl {
-    url = https://raw.githubusercontent.com/atom/atom/master/resources/atom.png;
-    sha256 = "66dc0b432eed7bcd738b7c1b194e539178a83d427c78f103041981f2b840e030";
-  };
-
-  desktopItem = makeDesktopItem {
-    name = "atom";
-    exec = "atom";
-    icon = iconsrc;
-    comment = "A hackable text editor for the 21st Century";
-    desktopName = "Atom";
-    genericName = "Text editor";
-    categories = "Development;TextEditor";
-  };
-
-  buildInputs = [ atomEnv makeWrapper ];
-
-  phases = [ "installPhase" ];
-
-  installPhase = ''
-    ensureDir $out/share/atom
-    ensureDir $out/bin
-    tar -C $out/share/atom -xvf $src
-    patchelf --set-interpreter "$(cat $NIX_GCC/nix-support/dynamic-linker)" \
-      $out/share/atom/atom
-    patchelf --set-interpreter "$(cat $NIX_GCC/nix-support/dynamic-linker)" \
-      $out/share/atom/resources/app/apm/node_modules/atom-package-manager/bin/node
-    makeWrapper $out/share/atom/atom $out/bin/atom \
-      --prefix "LD_LIBRARY_PATH" : "${atomEnv}/lib:${atomEnv}/lib64"
-
-    # Create a desktop item.
-    mkdir -p "$out/share/applications"
-    cp "${desktopItem}"/share/applications/* "$out/share/applications/"  
-  '';
-
-  meta = with stdenv.lib; {
-    description = "A hackable text editor for the 21st Century";
-    homepage = https://atom.io/;
-    license = [ licenses.mit ];
-    maintainers = [ maintainers.offline ];
-    platforms = [ "x86_64-linux" ];
-  };
-}
+in stdenv.lib.mapAttrs common versions

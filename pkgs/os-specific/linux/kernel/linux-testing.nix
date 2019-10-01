@@ -1,21 +1,18 @@
-{ stdenv, fetchurl, ... } @ args:
+{ stdenv, buildPackages, fetchurl, perl, buildLinux, modDirVersionArg ? null, ... } @ args:
 
-import ./generic.nix (args // rec {
-  # Reason to add:  RTL8192EE
-  version = "3.16-rc3";
-  modDirVersion = "3.16.0-rc3";
-  extraMeta.branch = "3.16";
+with stdenv.lib;
+
+buildLinux (args // rec {
+  version = "5.3-rc8";
+  extraMeta.branch = "5.3";
+
+  # modDirVersion needs to be x.y.z, will always add .0
+  modDirVersion = if (modDirVersionArg == null) then builtins.replaceStrings ["-"] [".0-"] version else modDirVersionArg;
 
   src = fetchurl {
-    url = "mirror://kernel/linux/kernel/v3.x/testing/linux-${version}.tar.xz";
-    sha256 = "17jgv1hnx2im68f8721x11yfg8mpas7lsxg0j00qxv2fc6km2glm";
+    url = "https://git.kernel.org/torvalds/t/linux-${version}.tar.gz";
+    sha256 = "01pr8xb9akjzafl8zkpwwkmlsjxghv5bx0larkjqdakjfspqnhzj";
   };
-
-  features.iwlwifi = true;
-  features.efiBootStub = true;
-  features.needsCifsUtils = true;
-  features.canDisableNetfilterConntrackHelpers = true;
-  features.netfilterRPFilter = true;
 
   # Should the testing kernels ever be built on Hydra?
   extraMeta.hydraPlatforms = [];

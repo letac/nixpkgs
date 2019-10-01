@@ -10,8 +10,8 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "GNU package for semiconductor device simulations";
-    homepage = http://www.gnu.org/software/archimedes;
-    license = "GPLv2+";
+    homepage = https://www.gnu.org/software/archimedes;
+    license = stdenv.lib.licenses.gpl2Plus;
     platforms = with stdenv.lib.platforms; linux;
   };
 }

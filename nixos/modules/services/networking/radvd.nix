@@ -52,24 +52,19 @@ in
 
   config = mkIf cfg.enable {
 
-    environment.systemPackages = [ pkgs.radvd ];
+    users.users.radvd =
+      { uid = config.ids.uids.radvd;
+        description = "Router Advertisement Daemon User";
+      };
 
-    jobs.radvd =
+    systemd.services.radvd =
       { description = "IPv6 Router Advertisement Daemon";
-
-        startOn = "started network-interfaces";
-
-        preStart =
-          ''
-            # !!! Radvd only works if IPv6 forwarding is enabled.  But
-            # this should probably be done somewhere else (and not
-            # necessarily for all interfaces).
-            echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
-          '';
-
-        exec = "${pkgs.radvd}/sbin/radvd -m syslog -s -C ${confFile}";
-
-        daemonType = "fork";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network.target" ];
+        serviceConfig =
+          { ExecStart = "@${pkgs.radvd}/bin/radvd radvd -n -u radvd -C ${confFile}";
+            Restart = "always";
+          };
       };
 
   };

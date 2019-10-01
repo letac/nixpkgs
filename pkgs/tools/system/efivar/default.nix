@@ -1,26 +1,40 @@
-{ stdenv, fetchgit, popt }:
+{ stdenv, buildPackages, fetchFromGitHub, fetchurl, pkgconfig, popt }:
 
 stdenv.mkDerivation rec {
-  name = "efivar-${version}";
-  version = "0.10";
+  pname = "efivar";
+  version = "37";
 
-  src = fetchgit {
-    url = "git://github.com/vathpela/efivar.git";
-    rev = "refs/tags/${version}";
-    sha256 = "04fznbmrf860b4d4i8rshx3mgwbx06v187wf1rddvxxnpkq8920w";
+  outputs = [ "bin" "out" "dev" "man" ];
+
+  src = fetchFromGitHub {
+    owner = "rhinstaller";
+    repo = "efivar";
+    rev = version;
+    sha256 = "1z2dw5x74wgvqgd8jvibfff0qhwkc53kxg54v12pzymyibagwf09";
   };
+  patches = [
+    (fetchurl {
+      name = "r13y.patch";
+      url = "https://patch-diff.githubusercontent.com/raw/rhboot/efivar/pull/133.patch";
+      sha256 = "038cwldb8sqnal5l6mhys92cqv8x7j8rgsl8i4fiv9ih9znw26i6";
+    })
+  ];
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [ popt ];
+  depsBuildBuild = [ buildPackages.stdenv.cc ];
 
-  installFlags = [
+  makeFlags = [
+    "prefix=$(out)"
     "libdir=$(out)/lib"
-    "mandir=$(out)/share/man"
-    "includedir=$(out)/include"
-    "bindir=$(out)/bin"
+    "bindir=$(bin)/bin"
+    "mandir=$(man)/share/man"
+    "includedir=$(dev)/include"
+    "PCDIR=$(dev)/lib/pkgconfig"
   ];
 
   meta = with stdenv.lib; {
-    homepage = http://github.com/vathpela/efivar;
+    inherit (src.meta) homepage;
     description = "Tools and library to manipulate EFI variables";
     platforms = platforms.linux;
     license = licenses.lgpl21;

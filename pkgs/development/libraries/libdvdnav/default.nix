@@ -1,30 +1,23 @@
 {stdenv, fetchurl, pkgconfig, libdvdread}:
 
-stdenv.mkDerivation {
-  name = "libdvdnav-4.2.1";
-  
+stdenv.mkDerivation rec {
+  pname = "libdvdnav";
+  version = "6.0.0";
+
   src = fetchurl {
-    url = http://dvdnav.mplayerhq.hu/releases/libdvdnav-4.2.1.tar.xz;
-    sha256 = "7fca272ecc3241b6de41bbbf7ac9a303ba25cb9e0c82aa23901d3104887f2372";
+    url = "http://get.videolan.org/libdvdnav/${version}/${pname}-${version}.tar.bz2";
+    sha256 = "062njcksmpgw9yv3737qkf93r2pzhaxi9szqjabpa8d010dp38ph";
   };
 
   nativeBuildInputs = [ pkgconfig ];
   buildInputs = [libdvdread];
-
-  configureScript = "./configure2"; # wtf?
-
-  preConfigure = ''
-    mkdir -p $out
-  '';
-
-  # From Handbrake
-  patches = [ ./A08-dvdnav-dup.patch ./P00-mingw-no-examples.patch ];
 
   meta = {
     homepage = http://dvdnav.mplayerhq.hu/;
     description = "A library that implements DVD navigation features such as DVD menus";
     license = stdenv.lib.licenses.gpl2;
     maintainers = [ stdenv.lib.maintainers.wmertens ];
+    platforms = stdenv.lib.platforms.unix;
   };
 
   passthru = { inherit libdvdread; };

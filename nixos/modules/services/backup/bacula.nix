@@ -15,7 +15,7 @@ let
         Name = "${fd_cfg.name}";
         FDPort = ${toString fd_cfg.port};
         WorkingDirectory = "${libDir}";
-        Pid Directory = "/var/run";
+        Pid Directory = "/run";
         ${fd_cfg.extraClientConfig}
       }
      
@@ -41,7 +41,7 @@ let
         Name = "${sd_cfg.name}";
         SDPort = ${toString sd_cfg.port};
         WorkingDirectory = "${libDir}";
-        Pid Directory = "/var/run";
+        Pid Directory = "/run";
         ${sd_cfg.extraStorageConfig}
       }
  
@@ -77,7 +77,7 @@ let
       Password = "${dir_cfg.password}";
       DirPort = ${toString dir_cfg.port};
       Working Directory = "${libDir}";
-      Pid Directory = "/var/run/";
+      Pid Directory = "/run/";
       QueryFile = "${pkgs.bacula}/etc/query.sql";
       ${dir_cfg.extraDirectorConfig}
     }
@@ -97,18 +97,7 @@ let
     ${dir_cfg.extraConfig}
     '';
 
-  # TODO: by default use this config
-  bconsole_conf = pkgs.writeText "bconsole.conf"
-    ''
-    Director {
-      Name = ${dir_cfg.name};
-      Address = "localhost";
-      DirPort = ${toString dir_cfg.port};
-      Password = "${dir_cfg.password}";
-    }
-    '';
-
-  directorOptions = {name, config, ...}:
+  directorOptions = {...}:
   {
     options = {
       password = mkOption {
@@ -128,7 +117,7 @@ let
     };
   };
 
-  deviceOptions = {name, config, ...}:
+  deviceOptions = {...}:
   {
     options = {
       archiveDevice = mkOption {
@@ -169,22 +158,27 @@ in {
         type = types.bool;
         default = false;
         description = ''
-          Whether to enable Bacula File Daemon.
+          Whether to enable the Bacula File Daemon.
         '';
       };
  
       name = mkOption {
         default = "${config.networking.hostName}-fd";
         description = ''
-        	The client name that must be used by the Director when connecting. Generally, it is a good idea to use a name related to the machine so that error messages can be easily identified if you have multiple Clients. This directive is required.
+          The client name that must be used by the Director when connecting.
+          Generally, it is a good idea to use a name related to the machine
+          so that error messages can be easily identified if you have multiple
+          Clients. This directive is required.
         '';
       };
  
       port = mkOption {
         default = 9102;
-        type = types.uniq types.int;
+        type = types.int;
         description = ''
-        	This specifies the port number on which the Client listens for Director connections. It must agree with the FDPort specified in the Client resource of the Director's configuration file. The default is 9102.
+          This specifies the port number on which the Client listens for
+          Director connections. It must agree with the FDPort specified in
+          the Client resource of the Director's configuration file.
         '';
       };
  
@@ -193,8 +187,7 @@ in {
         description = ''
           This option defines director resources in Bacula File Daemon.
         '';
-        type = types.attrsOf types.optionSet;
-        options = [ directorOptions ];
+        type = with types; attrsOf (submodule directorOptions);
       };
 
       extraClientConfig = mkOption {
@@ -237,7 +230,7 @@ in {
  
       port = mkOption {
         default = 9103;
-        type = types.uniq types.int;
+        type = types.int;
         description = ''
           Specifies port number on which the Storage daemon listens for Director connections. The default is 9103.
         '';
@@ -248,8 +241,7 @@ in {
         description = ''
           This option defines Director resources in Bacula Storage Daemon.
         '';
-        type = types.attrsOf types.optionSet;
-        options = [ directorOptions ];
+        type = with types; attrsOf (submodule directorOptions);
       };
 
       device = mkOption {
@@ -257,8 +249,7 @@ in {
         description = ''
           This option defines Device resources in Bacula Storage Daemon.
         '';
-        type = types.attrsOf types.optionSet;
-        options = [ deviceOptions ];
+        type = with types; attrsOf (submodule deviceOptions);
       };
  
       extraStorageConfig = mkOption {
@@ -302,7 +293,7 @@ in {
  
       port = mkOption {
         default = 9101;
-        type = types.uniq types.int;
+        type = types.int;
         description = ''
           Specify the port (a positive integer) on which the Director daemon will listen for Bacula Console connections. This same port number must be specified in the Director resource of the Console configuration file. The default is 9101, so normally this directive need not be specified. This directive should not be used if you specify DirAddresses (N.B plural) directive.
         '';
@@ -338,6 +329,7 @@ in {
 
       extraConfig = mkOption {
         default = "";
+        type = types.lines;
         description = ''
           Extra configuration for Bacula Director Daemon.
         '';
@@ -354,8 +346,12 @@ in {
       description = "Bacula File Daemon";
       wantedBy = [ "multi-user.target" ];
       path = [ pkgs.bacula ];
-      serviceConfig.ExecStart = "${pkgs.bacula}/sbin/bacula-fd -f -u root -g bacula -c ${fd_conf}";
-      serviceConfig.ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+      serviceConfig = {
+        ExecStart = "${pkgs.bacula}/sbin/bacula-fd -f -u root -g bacula -c ${fd_conf}";
+        ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+        LogsDirectory = "bacula";
+        StateDirectory = "bacula";
+      };
     };
 
     systemd.services.bacula-sd = mkIf sd_cfg.enable {
@@ -363,8 +359,12 @@ in {
       description = "Bacula Storage Daemon";
       wantedBy = [ "multi-user.target" ];
       path = [ pkgs.bacula ];
-      serviceConfig.ExecStart = "${pkgs.bacula}/sbin/bacula-sd -f -u bacula -g bacula -c ${sd_conf}";
-      serviceConfig.ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+      serviceConfig = {
+        ExecStart = "${pkgs.bacula}/sbin/bacula-sd -f -u bacula -g bacula -c ${sd_conf}";
+        ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+        LogsDirectory = "bacula";
+        StateDirectory = "bacula";
+      };
     };
 
     services.postgresql.enable = dir_cfg.enable == true;
@@ -374,8 +374,12 @@ in {
       description = "Bacula Director Daemon";
       wantedBy = [ "multi-user.target" ];
       path = [ pkgs.bacula ];
-      serviceConfig.ExecStart = "${pkgs.bacula}/sbin/bacula-dir -f -u bacula -g bacula -c ${dir_conf}";
-      serviceConfig.ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+      serviceConfig = {
+        ExecStart = "${pkgs.bacula}/sbin/bacula-dir -f -u bacula -g bacula -c ${dir_conf}";
+        ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+        LogsDirectory = "bacula";
+        StateDirectory = "bacula";
+      };
       preStart = ''
         if ! test -e "${libDir}/db-created"; then
             ${pkgs.postgresql}/bin/createuser --no-superuser --no-createdb --no-createrole bacula
@@ -394,7 +398,7 @@ in {
 
     environment.systemPackages = [ pkgs.bacula ];
 
-    users.extraUsers.bacula = {
+    users.users.bacula = {
       group = "bacula";
       uid = config.ids.uids.bacula;
       home = "${libDir}";
@@ -403,6 +407,6 @@ in {
       shell = "${pkgs.bash}/bin/bash";
     };
 
-    users.extraGroups.bacula.gid = config.ids.gids.bacula;
+    users.groups.bacula.gid = config.ids.gids.bacula;
   };
 }

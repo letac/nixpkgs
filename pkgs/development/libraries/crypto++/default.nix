@@ -1,55 +1,49 @@
-{ fetchurl, stdenv, unzip, libtool }:
+{ fetchFromGitHub, stdenv }:
 
 stdenv.mkDerivation rec {
-  name = "crypto++-5.6.2";
+  pname = "crypto++";
+  majorVersion = "5.6";
+  version = "${majorVersion}.5";
 
-  src = fetchurl {
-    url = "mirror://sourceforge/cryptopp/cryptopp562.zip";
-    sha256 = "0x1mqpz1v071cfrw4grbw7z734cxnpry1qh2b6rsmcx6nkyd5gsw";
+  src = fetchFromGitHub {
+    owner = "weidai11";
+    repo = "cryptopp";
+    rev = "CRYPTOPP_5_6_5";
+    sha256 = "1yk7jyf4va9425cg05llskpls2jm7n3jwy2hj5jm74zkr4mwpvl7";
   };
 
-  patches = stdenv.lib.optional (stdenv.system != "i686-cygwin") ./dll.patch;
+  patches = stdenv.lib.concatLists [
+    (stdenv.lib.optional (stdenv.hostPlatform.system != "i686-cygwin") ./dll.patch)
+    (stdenv.lib.optional stdenv.hostPlatform.isDarwin ./GNUmakefile-darwin.patch)
+  ];
 
-  buildInputs = [ unzip libtool ];
-
-  # Unpack the thing in a subdirectory.
-  unpackPhase = ''
-    echo "unpacking Crypto++ to \`${name}' from \`$PWD'..."
-    mkdir "${name}" && (cd "${name}" && unzip "$src")
-    sourceRoot="$PWD/${name}"
-  '';
-
-  cxxflags = if stdenv.isi686 then "-march=i686" else
-             if stdenv.isx86_64 then "-march=nocona -fPIC" else
-             "";
 
   configurePhase = ''
-    sed -i GNUmakefile \
-      -e 's|-march=native|${cxxflags}|g' \
-      -e 's|-mtune=native||g' \
-      -e '/^CXXFLAGS =/s|-g -O2|-O3|'
+      sed -i GNUmakefile \
+        -e 's|-march=native|-fPIC|g' \
+        -e '/^CXXFLAGS =/s|-g ||'
   '';
 
-  # I add what 'enableParallelBuilding' would add to the make call,
-  # if we were using the generic build phase.
-  buildPhase = ''
-    make PREFIX="$out" all libcryptopp.so -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
-  '';
+  enableParallelBuilding = true;
 
-  # TODO: Installing cryptotest.exe doesn't seem to be necessary. We run
-  # that binary during this build anyway to verify everything works.
-  installPhase = ''
-    mkdir "$out"
-    make install PREFIX="$out"
-  '';
+  makeFlags = [ "PREFIX=$(out)" ];
+  buildFlags = [ "libcryptopp.so" ];
+  installFlags = [ "LDCONF=true" ];
 
   doCheck = true;
   checkPhase = "LD_LIBRARY_PATH=`pwd` make test";
 
-  meta = {
+  # prefer -fPIC and .so to .a; cryptotest.exe seems superfluous
+  postInstall = ''
+    rm "$out"/lib/*.a -r "$out/bin"
+    ln -sf "$out"/lib/libcryptopp.so.${version} "$out"/lib/libcryptopp.so.${majorVersion}
+  '';
+
+  meta = with stdenv.lib; {
     description = "Crypto++, a free C++ class library of cryptographic schemes";
     homepage = http://cryptopp.com/;
-    license = "Boost 1.0";
+    license = licenses.boost;
+    platforms = platforms.all;
     maintainers = [ ];
   };
 }

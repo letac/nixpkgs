@@ -1,21 +1,28 @@
 { stdenv, fetchgit }:
 
 stdenv.mkDerivation {
-  name = "gnulib-0.1-83-g8008cac";
+  pname = "gnulib";
+  version = "20190326";
 
   src = fetchgit {
-    url = "http://git.savannah.gnu.org/r/gnulib.git";
-    rev = "8008cac0568ee76a4a9b7002f839e1abbad78af6";
-    sha256 = "1w8wh5ljh1qpssnj2lxizf45ggd7fgk5ggwhrnzjxxhn9m7rdvwm";
+    url = https://git.savannah.gnu.org/r/gnulib.git;
+    rev = "a18f7ce3c0aa760c33d46bbeb8e5b3a14cf24984";
+    sha256 = "04py5n3j17wyqv9wfsslcrxzapni9vmw6p5g0adzy2md3ygjw4x4";
   };
 
-  buildPhase = ":";
-
-  installPhase = "mkdir -p $out; mv * $out/";
+  dontFixup = true;
+  # no "make install", gnulib is a collection of source code
+  installPhase = ''
+    mkdir -p $out; mv * $out/
+    ln -s $out/lib $out/include
+    mkdir -p $out/bin
+    ln -s $out/gnulib-tool $out/bin/
+  '';
 
   meta = {
-    homepage = "http://www.gnu.org/software/gnulib/";
-    description = "central location for code to be shared among GNU packages";
+    homepage = https://www.gnu.org/software/gnulib/;
+    description = "Central location for code to be shared among GNU packages";
     license = stdenv.lib.licenses.gpl3Plus;
+    platforms = stdenv.lib.platforms.unix;
   };
 }

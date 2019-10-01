@@ -1,40 +1,46 @@
-a :  
-let 
-  fetchsvn = a.fetchsvn;
+{ stdenv, fetchurl
+, gtk3, libX11
+, makeWrapper, pkgconfig, perl, autoreconfHook, wrapGAppsHook
+}:
 
-  version = a.lib.attrByPath ["version"] "r8541" a;
-  buildInputs = with a; [
-    gtk pkgconfig libX11 perl
-  ];
-in
-rec {
-  src = fetchsvn {
-   url = svn://svn.tartarus.org/sgt/puzzles;
-   rev = "9773";
-   sha256 = "1m0mmxbcj0zi44dlmhk4h30d9hdy8g9f59r7k7906pgnnyf49611";
-  } + "/";
+stdenv.mkDerivation rec {
+  name = "sgt-puzzles-r${version}";
+  version = "20190415.e2135d5";
 
-  inherit buildInputs;
-  configureFlags = [];
-  makeFlags = ["prefix=$out" "gamesdir=$out/bin"];
+  src = fetchurl {
+   url = "http://www.chiark.greenend.org.uk/~sgtatham/puzzles/puzzles-${version}.tar.gz";
+   sha256 = "02p9kpvmqa0cm9y0lzdy7g8h4b4mqma8d9jfvgi2yysbgjfzq2ak";
+  };
 
-  neededDirs = ["$out/bin" "$out/share"];
-  extraDoc = ["puzzles.txt"];
+  nativeBuildInputs = [ autoreconfHook makeWrapper pkgconfig perl wrapGAppsHook ];
 
-  mkMakefiles = a.fullDepEntry ''
+  buildInputs = [ gtk3 libX11 ];
+
+  makeFlags = ["prefix=$(out)" "gamesdir=$(out)/bin"];
+  preInstall = ''
+    mkdir -p "$out"/{bin,share/doc/sgtpuzzles}
+    cp gamedesc.txt LICENCE README "$out/share/doc/sgtpuzzles"
+  '';
+  # SGT Puzzles use generic names like net, map, etc.
+  # Create symlinks with sgt-puzzle- prefix for possibility of
+  # disambiguation
+  postInstall = ''
+    (
+      cd "$out"/bin ;
+      for i in *; do ln -s "$i" "sgt-puzzle-$i"; done
+    )
+  '';
+  preConfigure = ''
     perl mkfiles.pl
-  '' ["minInit" "doUnpack" "addInputs"];
-
-  setVars = a.noDepEntry ''
     export NIX_LDFLAGS="$NIX_LDFLAGS -lX11"
     export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -Wno-error"
+    cp Makefile.gtk Makefile
   '';
-
-  /* doConfigure should be removed if not needed */
-  phaseNames = ["addInputs" "setVars" "mkMakefiles" "doMakeInstall"];
-
-  name = "sgt-puzzles-" + version;
-  meta = {
+  meta = with stdenv.lib; {
     description = "Simon Tatham's portable puzzle collection";
+    license = licenses.mit;
+    maintainers = [ maintainers.raskin ];
+    platforms = platforms.linux;
+    homepage = http://www.chiark.greenend.org.uk/~sgtatham/puzzles/;
   };
 }

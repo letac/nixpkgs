@@ -1,29 +1,36 @@
-{ stdenv, fetchurl, unzip, ant, jdk, makeWrapper }:
+{ stdenv, fetchurl, jdk11, rlwrap, makeWrapper }:
 
-let version = "1.6.0"; in
-
-stdenv.mkDerivation {
-  name = "clojure-${version}";
+stdenv.mkDerivation rec {
+  pname = "clojure";
+  version = "1.10.1.469";
 
   src = fetchurl {
-    url = "http://repo1.maven.org/maven2/org/clojure/clojure/${version}/clojure-${version}.zip";
-    sha256 = "0yv67gackrzlwn9f8cnpw14y2hwspklxhy1450rl71vdrqjahlwq";
+    url = "https://download.clojure.org/install/clojure-tools-${version}.tar.gz";
+    sha256 = "0hpb6rixmgllss69vl9zlpb41svm4mx4xmfbq1q7y12jsxckzgpq";
   };
 
-  buildInputs = [ unzip ant jdk makeWrapper ];
+  buildInputs = [ makeWrapper ];
 
-  buildPhase = "ant jar";
+  outputs = [ "out" "prefix" ];
 
-  installPhase = ''
-    mkdir -p $out/share/java $out/bin
-    install -t $out/share/java clojure.jar
-    makeWrapper ${jdk.jre}/bin/java $out/bin/clojure --add-flags "-cp $out/share/java/clojure.jar clojure.main"
+  installPhase = let
+    binPath = stdenv.lib.makeBinPath [ rlwrap jdk11 ];
+  in ''
+    mkdir -p $prefix/libexec
+    cp clojure-tools-${version}.jar $prefix/libexec
+    cp example-deps.edn $prefix
+
+    substituteInPlace clojure --replace PREFIX $prefix
+
+    install -Dt $out/bin clj clojure
+    wrapProgram $out/bin/clj --prefix PATH : $out/bin:${binPath}
+    wrapProgram $out/bin/clojure --prefix PATH : $out/bin:${binPath}
   '';
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "A Lisp dialect for the JVM";
-    homepage = http://clojure.org/;
-    license = stdenv.lib.licenses.bsd3;
+    homepage = https://clojure.org/;
+    license = licenses.epl10;
     longDescription = ''
       Clojure is a dynamic programming language that targets the Java
       Virtual Machine. It is designed to be a general-purpose language,
@@ -43,6 +50,7 @@ stdenv.mkDerivation {
       offers a software transactional memory system and reactive Agent
       system that ensure clean, correct, multithreaded designs.
     '';
-    maintainers = with stdenv.lib.maintainers; [ the-kenny ];
+    maintainers = with maintainers; [ jlesquembre ];
+    platforms = platforms.unix;
   };
 }

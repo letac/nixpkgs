@@ -1,23 +1,37 @@
-{ stdenv, fetchsvn, writeScript, ocaml, findlib, camlp5 }:
+{ stdenv, runtimeShell, fetchFromGitHub, ocaml, num, camlp5 }:
 
 let
-  start_script = ''
-    #!/bin/sh
-    cd "$out/lib/hol_light"
-    exec ${ocaml}/bin/ocaml -I \`${camlp5}/bin/camlp5 -where\` -init make.ml
-  '';
-in
-stdenv.mkDerivation rec {
-  name     = "hol_light-${version}";
-  version  = "189";
+  load_num =
+    if num == null then "" else
+      ''
+        -I ${num}/lib/ocaml/${ocaml.version}/site-lib/num \
+        -I ${num}/lib/ocaml/${ocaml.version}/site-lib/top-num \
+        -I ${num}/lib/ocaml/${ocaml.version}/site-lib/stublibs \
+      '';
 
-  src = fetchsvn {
-    url = http://hol-light.googlecode.com/svn/trunk;
-    rev = version;
-    sha256 = "1v10l64rs7da2kag3wlb651i09pn83icy9n5z84j8h1iwlxzajdh";
+  start_script =
+    ''
+      #!${runtimeShell}
+      cd $out/lib/hol_light
+      exec ${ocaml}/bin/ocaml \
+        -I \`${camlp5}/bin/camlp5 -where\` \
+        ${load_num} \
+        -init make.ml
+    '';
+in
+
+stdenv.mkDerivation {
+  name     = "hol_light-2019-03-27";
+
+  src = fetchFromGitHub {
+    owner  = "jrh13";
+    repo   = "hol-light";
+    rev    = "a2b487b38d9da47350f1b4316e34a8fa4cf7a40a";
+    sha256 = "1qlidl15qi8w4si8wxcmj8yg2srsb0q4k1ad9yd91sgx9h9aq8fk";
   };
 
-  buildInputs = [ ocaml findlib camlp5 ];
+  buildInputs = [ ocaml camlp5 ];
+  propagatedBuildInputs = [ num ];
 
   installPhase = ''
     mkdir -p "$out/lib/hol_light" "$out/bin"
@@ -26,11 +40,11 @@ stdenv.mkDerivation rec {
     chmod a+x "$out/bin/hol_light"
   '';
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "Interactive theorem prover based on Higher-Order Logic";
     homepage    = http://www.cl.cam.ac.uk/~jrh13/hol-light/;
-    license     = stdenv.lib.licenses.bsd2;
-    platforms   = stdenv.lib.platforms.unix;
-    maintainers = [ stdenv.lib.maintainers.thoughtpolice ];
+    license     = licenses.bsd2;
+    platforms   = platforms.unix;
+    maintainers = with maintainers; [ thoughtpolice z77z vbgl ];
   };
 }

@@ -1,24 +1,26 @@
-{ stdenv, fetchurl, bash }:
+{ stdenv, fetchurl, pkgconfig }:
 
 stdenv.mkDerivation rec {
-  name    = "capstone-${version}";
-  version = "2.1.2";
+  pname = "capstone";
+  version = "4.0.1";
 
   src = fetchurl {
-    url    = "http://www.capstone-engine.org/download/${version}/${name}.tgz";
-    sha256 = "1k6px3vdcsfby3lakss5sazs875kbzkzqk7cj79xrm2y5ik1vr29";
+    url    = "https://github.com/aquynh/capstone/archive/${version}.tar.gz";
+    sha256 = "1isxw2qwy1fi3m3w7igsr5klzczxc5cxndz0a78dfss6ps6ymfvr";
   };
 
-  buildPhase = false;
+  configurePhase = '' patchShebangs make.sh '';
+  buildPhase = '' ./make.sh '';
+  installPhase = '' env PREFIX=$out ./make.sh install '';
+  
+  nativeBuildInputs = [
+    pkgconfig
+  ];
 
-  patchPhase = ''
-    substituteInPlace make.sh --replace "/usr/bin/env bash" "${bash}/bin/bash"
-  '';
-
-  installPhase = "PREFIX=$out ./make.sh install";
+  enableParallelBuilding = true;
 
   meta = {
-    description = "advanced disassembly library";
+    description = "Advanced disassembly library";
     homepage    = "http://www.capstone-engine.org";
     license     = stdenv.lib.licenses.bsd3;
     platforms   = stdenv.lib.platforms.linux;

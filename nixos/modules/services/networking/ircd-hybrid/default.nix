@@ -12,7 +12,7 @@ let
     substFiles = [ "=>/conf" ./ircd.conf ];
     inherit (pkgs) ircdHybrid coreutils su iproute gnugrep procps;
 
-    ipv6Enabled = if config.networking.enableIPv6 then "true" else "false";
+    ipv6Enabled = boolToString config.networking.enableIPv6;
 
     inherit (cfg) serverName sid description adminEmail
             extraPort;
@@ -66,7 +66,7 @@ in
 
       rsaKey = mkOption {
         default = null;
-        example = /root/certificates/irc.key;
+        example = literalExample "/root/certificates/irc.key";
         description = "
           IRCD server RSA key.
         ";
@@ -74,7 +74,7 @@ in
 
       certificate = mkOption {
         default = null;
-        example = /root/certificates/irc.pem;
+        example = literalExample "/root/certificates/irc.pem";
         description = "
           IRCD server SSL certificate. There are some limitations - read manual.
         ";
@@ -112,26 +112,20 @@ in
 
   config = mkIf config.services.ircdHybrid.enable {
 
-    users.extraUsers = singleton
+    users.users = singleton
       { name = "ircd";
         description = "IRCD owner";
         group = "ircd";
         uid = config.ids.uids.ircd;
       };
 
-    users.extraGroups.ircd.gid = config.ids.gids.ircd;
+    users.groups.ircd.gid = config.ids.gids.ircd;
 
-    jobs.ircd_hybrid =
-      { name = "ircd-hybrid";
-
-        description = "IRCD Hybrid server";
-
-        startOn = "started networking";
-        stopOn = "stopping networking";
-
-        exec = "${ircdService}/bin/control start";
-      };
-
+    systemd.services.ircd-hybrid = {
+      description = "IRCD Hybrid server";
+      after = [ "started networking" ];
+      wantedBy = [ "multi-user.target" ];
+      script = "${ircdService}/bin/control start";
+    };
   };
-
 }

@@ -1,20 +1,45 @@
-{ stdenv, pkgs, fetchurl }:
+{ useLua ? !stdenv.isDarwin
+, usePcre ? true
+, stdenv, fetchurl
+, openssl, zlib, lua5_3 ? null, pcre ? null
+}:
+
+assert useLua -> lua5_3 != null;
+assert usePcre -> pcre != null;
 
 stdenv.mkDerivation rec {
-  version = "1.4.25";
-  name = "haproxy-${version}";
+  pname = "haproxy";
+  version = "1.9.8";
 
   src = fetchurl {
-    url = "http://haproxy.1wt.eu/download/1.4/src/${name}.tar.gz";
-    sha256 = "0qnvj6kbnrrc69nsp2dn5iv2z79adzkcgqssnk30iwvvwg0qwh44";
+    url = "https://www.haproxy.org/download/${stdenv.lib.versions.majorMinor version}/src/${pname}-${version}.tar.gz";
+    sha256 = "1via9k84ycrdr8qh4qchcbqgpv0gynm3ra23nwsvqwfqvc0376id";
   };
 
-  buildInputs = [ ];
+  buildInputs = [ openssl zlib ]
+    ++ stdenv.lib.optional useLua lua5_3
+    ++ stdenv.lib.optional usePcre pcre;
 
-  # TODO: make it work on darwin/bsd as well
-  preConfigure = ''
-    export makeFlags="TARGET=linux2628 PREFIX=$out"
-  '';
+  # TODO: make it work on bsd as well
+  makeFlags = [
+    "PREFIX=\${out}"
+    ("TARGET=" + (if stdenv.isSunOS  then "solaris"
+             else if stdenv.isLinux  then "linux2628"
+             else if stdenv.isDarwin then "osx"
+             else "generic"))
+  ];
+  buildFlags = [
+    "USE_OPENSSL=yes"
+    "USE_ZLIB=yes"
+  ] ++ stdenv.lib.optionals usePcre [
+    "USE_PCRE=yes"
+    "USE_PCRE_JIT=yes"
+  ] ++ stdenv.lib.optionals useLua [
+    "USE_LUA=yes"
+    "LUA_LIB=${lua5_3}/lib"
+    "LUA_INC=${lua5_3}/include"
+  ] ++ stdenv.lib.optional stdenv.isDarwin "CC=cc"
+    ++ stdenv.lib.optional stdenv.isLinux "USE_GETADDRINFO=1";
 
   meta = {
     description = "Reliable, high performance TCP/HTTP load balancer";
@@ -27,11 +52,8 @@ stdenv.mkDerivation rec {
       hardware.
     '';
     homepage = http://haproxy.1wt.eu;
-    maintainers = [ stdenv.lib.maintainers.garbas ];
-    platforms = stdenv.lib.platforms.linux;
-    /* TODO license = [
-       stdenv.lib.licenses.gpl2
-       stdenv.lib.licenses.lgpl21
-    ];*/
+    maintainers = with stdenv.lib.maintainers; [ fuzzy-id ];
+    platforms = with stdenv.lib.platforms; linux ++ darwin;
+    license = stdenv.lib.licenses.gpl2;
   };
 }

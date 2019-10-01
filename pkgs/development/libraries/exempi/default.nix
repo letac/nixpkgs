@@ -1,19 +1,26 @@
-{ stdenv, fetchurl, expat, zlib, boost }:
+{ stdenv, fetchurl, fetchpatch, expat, zlib, boost, libiconv, darwin }:
 
 stdenv.mkDerivation rec {
-  name = "exempi-2.2.1";
+  pname = "exempi";
+  version = "2.5.1";
 
   src = fetchurl {
-    url = "http://libopenraw.freedesktop.org/download/${name}.tar.bz2";
-    sha256 = "00d6gycl0wcyd3c71y0jp033a64z203rq0p0y07aig0s0j0477kc";
+    url = "https://libopenraw.freedesktop.org/download/${pname}-${version}.tar.bz2";
+    sha256 = "07i29xmg8bqriviaf4vi1mwha4lrw85kfla29cfym14fp3z8aqa0";
   };
 
-  configureFlags = [ "--with-boost=${boost}" ];
+  configureFlags = [
+    "--with-boost=${boost.dev}"
+  ];
 
-  buildInputs = [ expat zlib boost ];
+  buildInputs = [ expat zlib boost ]
+    ++ stdenv.lib.optionals stdenv.isDarwin [ libiconv darwin.apple_sdk.frameworks.CoreServices ];
+
+  doCheck = stdenv.isLinux;
 
   meta = with stdenv.lib; {
-    platforms = platforms.linux;
+    homepage = https://libopenraw.freedesktop.org/wiki/Exempi/;
+    platforms = platforms.linux ++ platforms.darwin;
     license = licenses.bsd3;
   };
 }

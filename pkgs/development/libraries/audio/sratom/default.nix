@@ -1,21 +1,16 @@
-{ stdenv, fetchurl, lv2, pkgconfig, python, serd, sord }:
+{ stdenv, fetchurl, lv2, pkgconfig, python, serd, sord, wafHook }:
 
 stdenv.mkDerivation rec {
-  name = "sratom-${version}";
-  version = "0.4.4";
+  pname = "sratom";
+  version = "0.6.2";
 
   src = fetchurl {
-    url = "http://download.drobilla.net/${name}.tar.bz2";
-    sha256 = "1q4044md8nmqah8ay5mf4lgdl6x0sfa4cjqyqk9da8nqzvs2j37s";
+    url = "https://download.drobilla.net/${pname}-${version}.tar.bz2";
+    sha256 = "0lz883ravxjf7r9wwbx2gx9m8vhyiavxrl9jdxfppjxnsralll8a";
   };
 
-  buildInputs = [ lv2 pkgconfig python serd sord ];
-
-  configurePhase = "python waf configure --prefix=$out";
-
-  buildPhase = "python waf";
-
-  installPhase = "python waf install";
+  nativeBuildInputs = [ pkgconfig wafHook ];
+  buildInputs = [ lv2 python serd sord ];
 
   meta = with stdenv.lib; {
     homepage = http://drobilla.net/software/sratom;

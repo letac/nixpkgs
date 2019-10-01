@@ -12,6 +12,8 @@ stdenv.mkDerivation rec {
 
   buildInputs = [ flex db ];
 
+  doCheck = false; # needs "y" tool
+
   meta = {
     homepage = http://bogofilter.sourceforge.net/;
     longDescription = ''
@@ -21,6 +23,7 @@ stdenv.mkDerivation rec {
       classifications and corrections.  It is based on a Bayesian
       filter.
     '';
-    license = "GPLv2";
+    license = stdenv.lib.licenses.gpl2;
+    platforms = stdenv.lib.platforms.linux;
   };
 }

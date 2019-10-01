@@ -17,8 +17,9 @@ stdenv.mkDerivation {
   
   meta = {
     description = "Whole genome association toolkit";
-    homepage = "http://pngu.mgh.harvard.edu/~purcell/plink/";
-    license = "GNUv2";
+    homepage = http://pngu.mgh.harvard.edu/~purcell/plink/;
+    license = stdenv.lib.licenses.gpl2;
     platforms = stdenv.lib.platforms.all;
+    broken = true;
   };
 }

@@ -1,8 +1,9 @@
 { fetchurl, stdenv, ocaml, makeWrapper, ncurses }:
 
 let version = "0.92"; in
-stdenv.mkDerivation rec {
-  name = "megam-${version}";
+stdenv.mkDerivation {
+  pname = "megam";
+  inherit version;
 
   src = fetchurl {
     url = "http://hal3.name/megam/megam_src.tgz";
@@ -41,6 +42,6 @@ stdenv.mkDerivation rec {
     license = "non-commercial";
 
     maintainers = [ ];
-    platforms = stdenv.lib.platforms.gnu;  # arbitrary choice
+    platforms = stdenv.lib.platforms.gnu ++ stdenv.lib.platforms.linux;  # arbitrary choice
   };
 }

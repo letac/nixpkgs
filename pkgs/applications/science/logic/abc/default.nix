@@ -1,25 +1,29 @@
-{ fetchhg, stdenv, readline }:
+{ fetchFromGitHub, stdenv, readline, cmake }:
 
-stdenv.mkDerivation rec {
-  name = "abc-verifier-${version}";
-  version = "140509"; # YYMMDD
+stdenv.mkDerivation {
+  pname = "abc-verifier";
+  version = "2018-07-08";
 
-  src = fetchhg {
-    url    = "https://bitbucket.org/alanmi/abc";
-    rev    = "03e221443d71e49e56cbc37f1907ee3b0ff3e7c9";
-    sha256 = "0ahrqg718y7xpv939f6x8w1kqh7wsja4pw8hca7j67j0qjdgb4lm";
+  src = fetchFromGitHub {
+    owner = "berkeley-abc";
+    repo = "abc";
+    rev    = "24407e13db4b8ca16c3996049b2d33ec3722de39";
+    sha256 = "1rckji7nk81n6v1yajz7daqwipxacv7zlafknvmbiwji30j47sq5";
   };
 
+  nativeBuildInputs = [ cmake ];
   buildInputs = [ readline ];
+
   enableParallelBuilding = true;
+
   installPhase = ''
     mkdir -p $out/bin
     mv abc $out/bin
   '';
 
   meta = {
-    description = "Sequential Logic Synthesis and Formal Verification";
-    homepage    = "www.eecs.berkeley.edu/~alanmi/abc/abc.htm";
+    description = "A tool for squential logic synthesis and formal verification";
+    homepage    = https://people.eecs.berkeley.edu/~alanmi/abc;
     license     = stdenv.lib.licenses.mit;
     platforms   = stdenv.lib.platforms.unix;
     maintainers = [ stdenv.lib.maintainers.thoughtpolice ];

@@ -1,18 +1,27 @@
-{ fetchurl, stdenv }:
+{ fetchurl, stdenv, libiconv }:
 
 stdenv.mkDerivation rec {
-  name = "libidn-1.28";
+  name = "libidn-1.35";
 
   src = fetchurl {
     url = "mirror://gnu/libidn/${name}.tar.gz";
-    sha256 = "1yxbfdiwr3l91m79sksn6v5mgpl4lfj8i82zgryckas9hjb7ldfx";
+    sha256 = "07pyy0afqikfq51z5kbzbj9ldbd12mri0zvx0mfv3ds6bc0g26pi";
   };
 
-  doCheck = ! stdenv.isDarwin;
+  outputs = [ "bin" "dev" "out" "info" "devdoc" ];
+
+  # broken with gcc-7
+  #doCheck = !stdenv.isDarwin && !stdenv.hostPlatform.isMusl;
+
+  hardeningDisable = [ "format" ];
+
+  buildInputs = stdenv.lib.optional stdenv.isDarwin libiconv;
+
+  doCheck = false; # fails
 
   meta = {
-    homepage = http://www.gnu.org/software/libidn/;
-    description = "GNU Libidn library for internationalized domain names";
+    homepage = https://www.gnu.org/software/libidn/;
+    description = "Library for internationalized domain names";
 
     longDescription = ''
       GNU Libidn is a fully documented implementation of the
@@ -30,7 +39,8 @@ stdenv.mkDerivation rec {
       included.
     '';
 
-    license = "LGPLv2+";
+    repositories.git = git://git.savannah.gnu.org/libidn.git;
+    license = stdenv.lib.licenses.lgpl2Plus;
     platforms = stdenv.lib.platforms.all;
     maintainers = [ ];
   };

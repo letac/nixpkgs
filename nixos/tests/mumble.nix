@@ -1,16 +1,19 @@
-import ./make-test.nix (
+import ./make-test.nix ({ pkgs, ...} : 
 
 let
-  client = { config, pkgs, ... }: {
+  client = { pkgs, ... }: {
     imports = [ ./common/x11.nix ];
     environment.systemPackages = [ pkgs.mumble ];
   };
 in
 {
   name = "mumble";
+  meta = with pkgs.stdenv.lib.maintainers; {
+    maintainers = [ thoughtpolice eelco ];
+  };
 
   nodes = {
-    server = { config, pkgs, ... }: {
+    server = { config, ... }: {
       services.murmur.enable       = true;
       services.murmur.registerName = "NixOS tests";
       networking.firewall.allowedTCPPorts = [ config.services.murmur.port ];
@@ -33,24 +36,35 @@ in
     # cancel client audio configuration
     $client1->waitForWindow(qr/Audio Tuning Wizard/);
     $client2->waitForWindow(qr/Audio Tuning Wizard/);
+    $server->sleep(5); # wait because mumble is slow to register event handlers
     $client1->sendKeys("esc");
     $client2->sendKeys("esc");
 
     # cancel client cert configuration
     $client1->waitForWindow(qr/Certificate Management/);
     $client2->waitForWindow(qr/Certificate Management/);
+    $server->sleep(5); # wait because mumble is slow to register event handlers
     $client1->sendKeys("esc");
     $client2->sendKeys("esc");
 
     # accept server certificate
     $client1->waitForWindow(qr/^Mumble$/);
     $client2->waitForWindow(qr/^Mumble$/);
+    $server->sleep(5); # wait because mumble is slow to register event handlers
+    $client1->sendChars("y");
+    $client2->sendChars("y");
+    $server->sleep(5); # wait because mumble is slow to register event handlers
+
+    # sometimes the wrong of the 2 windows is focused, we switch focus and try pressing "y" again
+    $client1->sendKeys("alt-tab");
+    $client2->sendKeys("alt-tab");
+    $server->sleep(5); # wait because mumble is slow to register event handlers
     $client1->sendChars("y");
     $client2->sendChars("y");
 
     # Find clients in logs
-    $server->waitUntilSucceeds("grep -q 'client1' /var/log/murmur/murmurd.log");
-    $server->waitUntilSucceeds("grep -q 'client2' /var/log/murmur/murmurd.log");
+    $server->waitUntilSucceeds("journalctl -eu murmur -o cat | grep -q client1");
+    $server->waitUntilSucceeds("journalctl -eu murmur -o cat | grep -q client2");
 
     $server->sleep(5); # wait to get screenshot
     $client1->screenshot("screen1");

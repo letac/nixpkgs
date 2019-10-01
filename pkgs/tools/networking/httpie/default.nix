@@ -1,22 +1,40 @@
-{ stdenv, fetchurl, pythonPackages }:
+{ stdenv, fetchFromGitHub, python3Packages, docutils, }:
 
-pythonPackages.buildPythonPackage rec {
-  name = "httpie-0.8.0";
-  namePrefix = "";
+python3Packages.buildPythonApplication rec {
+  pname = "httpie";
+  version = "1.0.3";
 
-  src = fetchurl {
-    url = "http://pypi.python.org/packages/source/h/httpie/${name}.tar.gz";
-    sha256 = "16f3scm794plxbyw7a5b4541hb2psa85kfi98g83785i2qwz98ag";
+  src = fetchFromGitHub {
+    owner = "jakubroztocil";
+    repo = "httpie";
+    rev = version;
+    sha256 = "0y30sp0x3nmgzi4dqw1rc3705hnn36ij0zlyyx7g6fqdq8bd8p5q";
   };
 
-  propagatedBuildInputs = with pythonPackages; [ pygments requests2 ];
+  propagatedBuildInputs = with python3Packages; [ pygments requests setuptools ];
+  dontUseSetuptoolsCheck = true;
 
-  doCheck = false;
+  disabledTests = [
+    "test_current_version"
+    "test_error"
+  ];
+
+  checkInputs = with python3Packages; [
+    mock
+    pytest
+    pytest-httpbin
+    pytestCheckHook
+  ];
+
+  # the tests call rst2pseudoxml.py from docutils
+  preCheck = ''
+    export PATH=${docutils}/bin:$PATH
+  '';
 
   meta = {
     description = "A command line HTTP client whose goal is to make CLI human-friendly";
-    homepage = http://httpie.org/;
+    homepage = https://httpie.org/;
     license = stdenv.lib.licenses.bsd3;
-    maintainers = with stdenv.lib.maintainers; [ antono relrod ];
+    maintainers = with stdenv.lib.maintainers; [ antono relrod schneefux ];
   };
 }

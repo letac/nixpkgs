@@ -1,13 +1,31 @@
-{ stdenv, fetchurl, pythonPackages }:
+{ stdenv
+, buildPythonPackage
+, fetchurl
+, nose
+, six
+, isPy3k
+}:
 
-pythonPackages.buildPythonPackage rec {
-  name = "rbtools-0.4.1";
-  namePrefix = "";
+buildPythonPackage {
+  pname = "rbtools";
+  version = "0.7.2";
+  disabled = isPy3k;
 
   src = fetchurl {
-    url = "http://downloads.reviewboard.org/releases/RBTools/0.4/RBTools-0.4.1.tar.gz";
-    sha256 = "1v0r7rfzrasj56s53mib51wl056g7ykh2y1c6dwv12r6hzqsycgv";
+    url = "http://downloads.reviewboard.org/releases/RBTools/0.7/RBTools-0.7.2.tar.gz";
+    sha256 = "1ng8l8cx81cz23ls7fq9wz4ijs0zbbaqh4kj0mj6plzcqcf8na4i";
   };
 
-  propagatedBuildInputs = [ pythonPackages.setuptools ];
+  checkInputs = [ nose ];
+  propagatedBuildInputs = [ six ];
+
+  checkPhase = "LC_ALL=C nosetests";
+
+  meta = with stdenv.lib; {
+    homepage = https://www.reviewboard.org/docs/rbtools/dev/;
+    description = "RBTools is a set of command line tools for working with Review Board and RBCommons";
+    license = licenses.mit;
+    maintainers = with maintainers; [ domenkozar ];
+  };
+
 }

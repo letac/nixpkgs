@@ -1,36 +1,51 @@
 # Miscellaneous small tests that don't warrant their own VM run.
 
-import ./make-test.nix {
+import ./make-test.nix ({ pkgs, ...} : rec {
   name = "misc";
+  meta = with pkgs.stdenv.lib.maintainers; {
+    maintainers = [ eelco ];
+  };
+
+  foo = pkgs.writeText "foo" "Hello World";
 
   machine =
-    { config, lib, pkgs, ... }:
+    { lib, ... }:
     with lib;
     { swapDevices = mkOverride 0
         [ { device = "/root/swapfile"; size = 128; } ];
       environment.variables.EDITOR = mkOverride 0 "emacs";
-      services.nixosManual.enable = mkOverride 0 true;
+      documentation.nixos.enable = mkOverride 0 true;
       systemd.tmpfiles.rules = [ "d /tmp 1777 root root 10d" ];
       fileSystems = mkVMOverride { "/tmp2" =
-        { device = "none";
-          fsType = "tmpfs";
-          options = "mode=1777,noauto";
+        { fsType = "tmpfs";
+          options = [ "mode=1777" "noauto" ];
         };
       };
       systemd.automounts = singleton
         { wantedBy = [ "multi-user.target" ];
           where = "/tmp2";
         };
+      users.users.sybil = { isNormalUser = true; group = "wheel"; };
+      security.sudo = { enable = true; wheelNeedsPassword = false; };
+      boot.kernel.sysctl."vm.swappiness" = 1;
+      boot.kernelParams = [ "vsyscall=emulate" ];
+      system.extraDependencies = [ foo ];
     };
 
   testScript =
     ''
+      subtest "nix-db", sub {
+          my $json = $machine->succeed("nix path-info --json ${foo}");
+          $json =~ /"narHash":"sha256:0afw0d9j1hvwiz066z93jiddc33nxg6i6qyp26vnqyglpyfivlq5"/ or die "narHash not set";
+          $json =~ /"narSize":128/ or die "narSize not set";
+      };
+
       subtest "nixos-version", sub {
           $machine->succeed("[ `nixos-version | wc -w` = 2 ]");
       };
 
       subtest "nixos-rebuild", sub {
-          $machine->succeed("nixos-rebuild --help | grep SYNOPSIS");
+          $machine->succeed("nixos-rebuild --help | grep 'NixOS module' ");
       };
 
       # Sanity check for uid/gid assignment.
@@ -63,6 +78,8 @@ import ./make-test.nix {
 
       # Test whether we have a reboot record in wtmp.
       subtest "reboot-wtmp", sub {
+          $machine->shutdown;
+          $machine->waitForUnit('multi-user.target');
           $machine->succeed("last | grep reboot >&2");
       };
 
@@ -78,9 +95,10 @@ import ./make-test.nix {
       };
 
       # Test whether systemd-udevd automatically loads modules for our hardware.
+      $machine->succeed("systemctl start systemd-udev-settle.service");
       subtest "udev-auto-load", sub {
           $machine->waitForUnit('systemd-udev-settle.service');
-          $machine->succeed('lsmod | grep psmouse');
+          $machine->succeed('lsmod | grep mousedev');
       };
 
       # Test whether systemd-tmpfiles-clean works.
@@ -103,6 +121,22 @@ import ./make-test.nix {
       subtest "shell-vars", sub {
           $machine->succeed('[ -n "$NIX_PATH" ]');
       };
-    '';
 
-}
+      subtest "nix-db", sub {
+          $machine->succeed("nix-store -qR /run/current-system | grep nixos-");
+      };
+
+      # Test sysctl
+      subtest "sysctl", sub {
+          $machine->waitForUnit("systemd-sysctl.service");
+          $machine->succeed('[ `sysctl -ne vm.swappiness` = 1 ]');
+          $machine->execute('sysctl vm.swappiness=60');
+          $machine->succeed('[ `sysctl -ne vm.swappiness` = 60 ]');
+      };
+
+      # Test boot parameters
+      subtest "bootparam", sub {
+          $machine->succeed('grep -Fq vsyscall=emulate /proc/cmdline');
+      };
+    '';
+})

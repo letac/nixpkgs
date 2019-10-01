@@ -1,54 +1,42 @@
-{ stdenv, fetchurl, pythonPackages, gettext, pyqt4
-, pkgconfig, libdiscid, libofa, ffmpeg, acoustidFingerprinter
-}:
+{ stdenv, python3Packages, fetchFromGitHub, gettext, chromaprint, qt5 }:
 
-pythonPackages.buildPythonPackage rec {
-  name = "picard-${version}";
-  namePrefix = "";
-  version = "1.2";
+let
+  pythonPackages = python3Packages;
+in pythonPackages.buildPythonApplication rec {
+  pname = "picard";
+  version = "2.2.1";
 
-  src = fetchurl {
-    url = "http://ftp.musicbrainz.org/pub/musicbrainz/picard/${name}.tar.gz";
-    md5 = "d1086687b7f7b0d359a731b1a25e7b66";
+  src = fetchFromGitHub {
+    owner = "metabrainz";
+    repo = pname;
+    rev = "release-${version}";
+    sha256 = "1g7pbicf65hswbqmhrwlba9jm4r2vnggy7vy75z4256y7qcpwdfd";
   };
 
-  postPatch = let
-    fpr = "${acoustidFingerprinter}/bin/acoustid_fpcalc";
-  in ''
-    sed -ri -e 's|(TextOption.*"acoustid_fpcalc"[^"]*")[^"]*|\1${fpr}|' \
-      picard/ui/options/fingerprinting.py
-  '';
+  nativeBuildInputs = [ gettext qt5.wrapQtAppsHook qt5.qtbase ];
 
-  buildInputs = [
-    pkgconfig
-    ffmpeg
-    libofa
-    gettext
+  propagatedBuildInputs = with pythonPackages; [
+    pyqt5
+    mutagen
+    chromaprint
+    discid
   ];
 
-  propagatedBuildInputs = [
-    pythonPackages.mutagen
-    pyqt4
-    libdiscid
-  ];
-
-  configurePhase = ''
-    python setup.py config
-  '';
-
-  buildPhase = ''
-    python setup.py build
+  prePatch = ''
+    # Pesky unicode punctuation.
+    substituteInPlace setup.cfg --replace "‘" "'"
   '';
 
   installPhase = ''
     python setup.py install --prefix="$out"
+    wrapQtApp $out/bin/picard
   '';
 
-  doCheck = false;
-
-  meta = {
-    homepage = "http://musicbrainz.org/doc/MusicBrainz_Picard";
+  meta = with stdenv.lib; {
+    homepage = http://musicbrainz.org/doc/MusicBrainz_Picard;
     description = "The official MusicBrainz tagger";
-    license = stdenv.lib.licenses.gpl2;
+    maintainers = with maintainers; [ ehmry ];
+    license = licenses.gpl2;
+    platforms = platforms.all;
   };
 }

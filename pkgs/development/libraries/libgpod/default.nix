@@ -1,8 +1,12 @@
-{stdenv, fetchurl, gettext, perl, perlXMLParser, intltool, pkgconfig, glib,
-  libxml2, sqlite, libusb1, zlib, sg3_utils, gdk_pixbuf, taglib,
-  libimobiledevice, python, pygobject, mutagen }:
+{stdenv, lib, fetchurl, gettext, perlPackages, intltool, pkgconfig, glib,
+  libxml2, sqlite, zlib, sg3_utils, gdk-pixbuf, taglib,
+  libimobiledevice, pythonPackages, mutagen,
+  monoSupport ? false, mono, gtk-sharp-2_0
+}:
 
-stdenv.mkDerivation rec {
+let
+  inherit (pythonPackages) python pygobject2;
+in stdenv.mkDerivation rec {
   name = "libgpod-0.8.3";
   src = fetchurl {
     url = "mirror://sourceforge/gtkpod/${name}.tar.bz2";
@@ -10,19 +14,26 @@ stdenv.mkDerivation rec {
   };
 
   preConfigure = "configureFlagsArray=( --with-udev-dir=$out/lib/udev )";
-  configureFlags = "--without-hal --enable-udev";
+
+  configureFlags = [
+    "--without-hal"
+    "--enable-udev"
+  ] ++ lib.optionals monoSupport [ "--with-mono" ];
+
+  dontStrip = true;
 
   propagatedBuildInputs = [ glib libxml2 sqlite zlib sg3_utils
-    gdk_pixbuf taglib libimobiledevice python pygobject mutagen ];
+    gdk-pixbuf taglib libimobiledevice python pygobject2 mutagen ];
 
-  nativeBuildInputs = [ gettext perlXMLParser intltool pkgconfig perl
-    libimobiledevice.swig ];
+  nativeBuildInputs = [ gettext intltool pkgconfig ]
+    ++ (with perlPackages; [ perl XMLParser ])
+    ++ lib.optionals monoSupport [ mono gtk-sharp-2_0 ];
 
   meta = {
-    homepage = http://gtkpod.sourceforge.net/;
+    homepage = https://gtkpod.sourceforge.net/;
     description = "Library used by gtkpod to access the contents of an ipod";
     license = "LGPL";
-    platforms = stdenv.lib.platforms.gnu;
-    maintainers = [ stdenv.lib.maintainers.urkud ];
+    platforms = stdenv.lib.platforms.gnu ++ stdenv.lib.platforms.linux;
+    maintainers = [ ];
   };
 }

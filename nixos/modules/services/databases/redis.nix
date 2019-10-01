@@ -8,17 +8,19 @@ let
   condOption = name: value: if value != null then "${name} ${toString value}" else "";
 
   redisConfig = pkgs.writeText "redis.conf" ''
-    pidfile ${cfg.pidFile}
     port ${toString cfg.port}
     ${condOption "bind" cfg.bind}
     ${condOption "unixsocket" cfg.unixSocket}
+    daemonize yes
+    supervised systemd
     loglevel ${cfg.logLevel}
     logfile ${cfg.logfile}
     syslog-enabled ${redisBool cfg.syslog}
+    pidfile /run/redis/redis.pid
     databases ${toString cfg.databases}
     ${concatMapStrings (d: "save ${toString (builtins.elemAt d 0)} ${toString (builtins.elemAt d 1)}\n") cfg.save}
-    dbfilename ${cfg.dbFilename}
-    dir ${toString cfg.dbpath}
+    dbfilename dump.rdb
+    dir /var/lib/redis
     ${if cfg.slaveOf != null then "slaveof ${cfg.slaveOf.ip} ${toString cfg.slaveOf.port}" else ""}
     ${condOption "masterauth" cfg.masterAuth}
     ${condOption "requirepass" cfg.requirePass}
@@ -40,31 +42,41 @@ in
       enable = mkOption {
         type = types.bool;
         default = false;
-        description = "Whether to enable the Redis server.";
+        description = ''
+          Whether to enable the Redis server. Note that the NixOS module for
+          Redis disables kernel support for Transparent Huge Pages (THP),
+          because this features causes major performance problems for Redis,
+          e.g. (https://redis.io/topics/latency).
+        '';
       };
 
       package = mkOption {
         type = types.package;
         default = pkgs.redis;
+        defaultText = "pkgs.redis";
         description = "Which Redis derivation to use.";
-      };
-
-      user = mkOption {
-        type = types.str;
-        default = "redis";
-        description = "User account under which Redis runs.";
-      };
-
-      pidFile = mkOption {
-        type = types.path;
-        default = "/var/lib/redis/redis.pid";
-        description = "";
       };
 
       port = mkOption {
         type = types.int;
         default = 6379;
         description = "The port for Redis to listen to.";
+      };
+
+      vmOverCommit = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Set vm.overcommit_memory to 1 (Suggested for Background Saving: http://redis.io/topics/faq)
+        '';
+      };
+
+      openFirewall = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Whether to open ports in the firewall for the server.
+        '';
       };
 
       bind = mkOption {
@@ -78,7 +90,7 @@ in
         type = with types; nullOr path;
         default = null;
         description = "The path to the socket to bind to.";
-        example = "/var/run/redis.sock";
+        example = "/run/redis/redis.sock";
       };
 
       logLevel = mkOption {
@@ -114,18 +126,6 @@ in
         example = [ [900 1] [300 10] [60 10000] ];
       };
 
-      dbFilename = mkOption {
-        type = types.str;
-        default = "dump.rdb";
-        description = "The filename where to dump the DB.";
-      };
-
-      dbpath = mkOption {
-        type = types.path;
-        default = "/var/lib/redis";
-        description = "The DB will be written inside this directory, with the filename specified using the 'dbFilename' configuration.";
-      };
-
       slaveOf = mkOption {
         default = null; # { ip, port }
         description = "An attribute set with two attributes: ip and port to which this redis instance acts as a slave.";
@@ -151,12 +151,6 @@ in
         type = types.bool;
         default = false;
         description = "By default data is only periodically persisted to disk, enable this option to use an append-only file for improved persistence.";
-      };
-
-      appendOnlyFilename = mkOption {
-        type = types.str;
-        default = "appendonly.aof";
-        description = "Filename for the append-only file (stored inside of dbpath)";
       };
 
       appendFsync = mkOption {
@@ -192,38 +186,38 @@ in
 
   config = mkIf config.services.redis.enable {
 
-    users.extraUsers.redis =
-      { name = cfg.user;
-        uid = config.ids.uids.redis;
-        description = "Redis database user";
-      };
+    boot.kernel.sysctl = mkIf cfg.vmOverCommit {
+      "vm.overcommit_memory" = "1";
+    };
+
+    networking.firewall = mkIf cfg.openFirewall {
+      allowedTCPPorts = [ cfg.port ];
+    };
+
+    users.users.redis.description = "Redis database user";
 
     environment.systemPackages = [ cfg.package ];
 
-    systemd.services.redis_init =
-      { description = "Redis server initialisation";
-
-        wantedBy = [ "redis.service" ];
-        before = [ "redis.service" ];
-
-        serviceConfig.Type = "oneshot";
-
-        script = ''
-          if ! test -e ${cfg.dbpath}; then
-              install -d -m0700 -o ${cfg.user} ${cfg.dbpath}
-          fi
-        '';
-      };
+    systemd.services.disable-transparent-huge-pages = {
+      description = "Disable Transparent Huge Pages (required by Redis)";
+      before = [ "redis.service" ];
+      wantedBy = [ "redis.service" ];
+      script = "echo never > /sys/kernel/mm/transparent_hugepage/enabled";
+      serviceConfig.Type = "oneshot";
+    };
 
     systemd.services.redis =
-      { description = "Redis server";
+      { description = "Redis Server";
 
         wantedBy = [ "multi-user.target" ];
         after = [ "network.target" ];
 
         serviceConfig = {
           ExecStart = "${cfg.package}/bin/redis-server ${redisConfig}";
-          User = cfg.user;
+          RuntimeDirectory = "redis";
+          StateDirectory = "redis";
+          Type = "notify";
+          User = "redis";
         };
       };
 

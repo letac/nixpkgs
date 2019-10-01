@@ -1,28 +1,30 @@
-{stdenv, fetchurl, wget, bash, coreutils}:
-  stdenv.mkDerivation rec {
-    version = "2.23";
-    name = "wgetpaste-${version}";
-      src = fetchurl {
-        url = "http://wgetpaste.zlin.dk/${name}.tar.bz2";
-        sha256 = "1xam745f5pmqi16br72a866117hnmcfwjyvsw1jhg3npbdnm9x6n";
-    };
-    # currently zsh-autocompletion support is not installed
+{ stdenv, fetchurl, wget, bash }:
 
-    prePatch = ''
-      substituteInPlace wgetpaste --replace "/usr/bin/env bash" "${bash}/bin/bash"
-      substituteInPlace wgetpaste --replace "LC_ALL=C wget" "LC_ALL=C ${wget}/bin/wget"
-    '';
+stdenv.mkDerivation rec {
+  version = "2.29";
+  pname = "wgetpaste";
 
-    installPhase = ''
-      mkdir -p $out/bin;
-      cp wgetpaste $out/bin;
-    '';
+  src = fetchurl {
+    url = "http://wgetpaste.zlin.dk/${pname}-${version}.tar.bz2";
+    sha256 = "1rp0wxr3zy7y2xp3azaadfghrx7g0m138f9qg6icjxkkz4vj9r22";
+  };
+  # currently zsh-autocompletion support is not installed
 
-    meta = {
-      description = "Command-line interface to various pastebins";
-      homepage = http://wgetpaste.zlin.dk/;
-      license = "publicDomain";
-      maintainers = with stdenv.lib.maintainers; [qknight];
-      platforms = stdenv.lib.platforms.all;
-    };
-  }
+  prePatch = ''
+    substituteInPlace wgetpaste --replace "/usr/bin/env bash" "${bash}/bin/bash"
+    substituteInPlace wgetpaste --replace "LC_ALL=C wget" "LC_ALL=C ${wget}/bin/wget"
+  '';
+
+  installPhase = ''
+    mkdir -p $out/bin;
+    cp wgetpaste $out/bin;
+  '';
+
+  meta = {
+    description = "Command-line interface to various pastebins";
+    homepage = http://wgetpaste.zlin.dk/;
+    license = stdenv.lib.licenses.publicDomain;
+    maintainers = with stdenv.lib.maintainers; [ qknight domenkozar ndowens ];
+    platforms = stdenv.lib.platforms.all;
+  };
+}

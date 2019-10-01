@@ -1,14 +1,23 @@
-{stdenv, fetchurl}:
-stdenv.mkDerivation {
-  name = "units-2.10";
+{ stdenv, fetchurl, readline }:
+
+stdenv.mkDerivation rec {
+  pname = "units";
+  version = "2.19";
 
   src = fetchurl {
-    url = mirror://gnu/units/units-2.10.tar.gz;
-    sha256 = "0fa4bk5aqyis5zisz6l8mqqk76njj6zgx3pbrjp5kvraz1dz78lc";
+    url = "mirror://gnu/units/${pname}-${version}.tar.gz";
+    sha256 = "0mk562g7dnidjgfgvkxxpvlba66fh1ykmfd9ylzvcln1vxmi6qj2";
   };
 
-  meta = {
+  buildInputs = [ readline ];
+
+  doCheck = true;
+
+  meta = with stdenv.lib; {
     description = "Unit conversion tool";
-    platforms = stdenv.lib.platforms.linux;
+    homepage = https://www.gnu.org/software/units/;
+    license = [ licenses.gpl3Plus ];
+    platforms = platforms.all;
+    maintainers = [ maintainers.vrthra ];
   };
 }

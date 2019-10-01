@@ -1,20 +1,56 @@
-{ stdenv, fetchurl, ncurses, gettext }:
+{ stdenv, fetchurl, fetchFromGitHub
+, ncurses
+, texinfo
+, gettext ? null
+, enableNls ? true
+, enableTiny ? false
+}:
 
-stdenv.mkDerivation (rec {
+assert enableNls -> (gettext != null);
+
+with stdenv.lib;
+
+let
+  nixSyntaxHighlight = fetchFromGitHub {
+    owner = "seitz";
+    repo = "nanonix";
+    rev = "bf8d898efaa10dce3f7972ff765b58c353b4b4ab";
+    sha256 = "0773s5iz8aw9npgyasb0r2ybp6gvy2s9sq51az8w7h52bzn5blnn";
+  };
+
+in stdenv.mkDerivation rec {
   pname = "nano";
-  version = "2.3.2";
-
-  name = "${pname}-${version}";
+  version = "4.4";
 
   src = fetchurl {
-    url = "mirror://gnu/nano/${name}.tar.gz";
-    sha256 = "1s3b21h5p7r8xafw0gahswj16ai6k2vnjhmd15b491hl0x494c7z";
+    url = "mirror://gnu/nano/${pname}-${version}.tar.xz";
+    sha256 = "1iw2ypq34g1gfqyhgka2fz5yj5vrlz85q6zk7amgyj286ph25wia";
   };
 
-  buildInputs = [ ncurses gettext ];
+  nativeBuildInputs = [ texinfo ] ++ optional enableNls gettext;
+  buildInputs = [ ncurses ];
+
+  outputs = [ "out" "info" ];
+
+  configureFlags = [
+    "--sysconfdir=/etc"
+    (stdenv.lib.enableFeature enableNls "nls")
+    (stdenv.lib.enableFeature enableTiny "tiny")
+  ];
+
+  postInstall = ''
+    cp ${nixSyntaxHighlight}/nix.nanorc $out/share/nano/
+  '';
+
+  enableParallelBuilding = true;
 
   meta = {
-    homepage = http://www.nano-editor.org/;
+    homepage = https://www.nano-editor.org/;
     description = "A small, user-friendly console text editor";
+    license = licenses.gpl3Plus;
+    maintainers = with maintainers; [
+      joachifm
+    ];
+    platforms = platforms.all;
   };
-})
+}

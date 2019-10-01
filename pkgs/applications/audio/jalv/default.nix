@@ -1,24 +1,19 @@
-{ stdenv, fetchurl, gtk, jackaudio, lilv, lv2, pkgconfig, python
-, serd, sord , sratom, suil }:
+{ stdenv, fetchurl, gtk2, libjack2, lilv, lv2, pkgconfig, python
+, serd, sord , sratom, suil, wafHook }:
 
 stdenv.mkDerivation  rec {
-  name = "jalv-${version}";
-  version = "1.4.4";
+  pname = "jalv";
+  version = "1.6.2";
 
   src = fetchurl {
-    url = "http://download.drobilla.net/${name}.tar.bz2";
-    sha256 = "1iql1r52rmf87q6jkxhcxa3lpq7idzzg55ma91wphywyvh29q7lf";
+    url = "https://download.drobilla.net/${pname}-${version}.tar.bz2";
+    sha256 = "13al2hb9s3m7jgbg051x704bmzmcg4wb56cfh8z588kiyh0mxpaa";
   };
 
+  nativeBuildInputs = [ pkgconfig wafHook ];
   buildInputs = [
-    gtk jackaudio lilv lv2 pkgconfig python serd sord sratom suil
+    gtk2 libjack2 lilv lv2 python serd sord sratom suil
   ];
-
-  configurePhase = "python waf configure --prefix=$out";
-
-  buildPhase = "python waf";
-
-  installPhase = "python waf install";
 
   meta = with stdenv.lib; {
     description = "A simple but fully featured LV2 host for Jack";

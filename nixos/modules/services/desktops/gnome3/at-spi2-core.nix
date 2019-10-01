@@ -4,9 +4,6 @@
 
 with lib;
 
-let
-  gnome3 = config.environment.gnome3.packageSet;
-in
 {
 
   ###### interface
@@ -31,12 +28,15 @@ in
 
   ###### implementation
 
-  config = mkIf config.services.gnome3.at-spi2-core.enable {
+  config = mkMerge [
+    (mkIf config.services.gnome3.at-spi2-core.enable {
+      environment.systemPackages = [ pkgs.at-spi2-core ];
+      services.dbus.packages = [ pkgs.at-spi2-core ];
+      systemd.packages = [ pkgs.at-spi2-core ];
+    })
 
-    environment.systemPackages = [ gnome3.at_spi2_core ];
-
-    services.dbus.packages = [ gnome3.at_spi2_core ];
-
-  };
-
+    (mkIf (!config.services.gnome3.at-spi2-core.enable) {
+      environment.variables.NO_AT_BRIDGE = "1";
+    })
+  ];
 }

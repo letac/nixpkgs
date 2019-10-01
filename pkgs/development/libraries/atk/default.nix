@@ -1,26 +1,38 @@
-{ stdenv, fetchurl, pkgconfig, perl, glib, libintlOrEmpty, gobjectIntrospection }:
+{ stdenv, fetchurl, meson, ninja, gettext, pkgconfig, glib
+, fixDarwinDylibNames, gobject-introspection, gnome3
+}:
 
 let
-  ver_maj = "2.12";
-  ver_min = "0";
+  pname = "atk";
+  version = "2.32.0";
 in
+
 stdenv.mkDerivation rec {
-  name = "atk-${ver_maj}.${ver_min}";
+  name = "${pname}-${version}";
 
   src = fetchurl {
-    url = "mirror://gnome/sources/atk/${ver_maj}/${name}.tar.xz";
-    sha256 = "13zijfcmx7sda83qkryzsmr9hw0r3b73xkagq9cmm733fhcl7a28";
+    url = "mirror://gnome/sources/${pname}/${stdenv.lib.versions.majorMinor version}/${name}.tar.xz";
+    sha256 = "1k4i817bd2w5b9z394f2yyx95591l2746wa40am0vvz4gzdgwhfb";
   };
 
-  buildInputs = libintlOrEmpty;
+  outputs = [ "out" "dev" ];
 
-  nativeBuildInputs = [ pkgconfig perl ];
+  buildInputs = stdenv.lib.optional stdenv.isDarwin fixDarwinDylibNames;
 
-  propagatedBuildInputs = [ glib gobjectIntrospection /*ToDo: why propagate*/ ];
+  nativeBuildInputs = [ meson ninja pkgconfig gettext gobject-introspection ];
 
-  #doCheck = true; # no checks in there (2.10.0)
+  propagatedBuildInputs = [
+    # Required by atk.pc
+    glib
+  ];
 
-  postInstall = "rm -rf $out/share/gtk-doc";
+  doCheck = true;
+
+  passthru = {
+    updateScript = gnome3.updateScript {
+      packageName = pname;
+    };
+  };
 
   meta = {
     description = "Accessibility toolkit";
@@ -35,9 +47,9 @@ stdenv.mkDerivation rec {
 
     homepage = http://library.gnome.org/devel/atk/;
 
-    license = "LGPLv2+";
+    license = stdenv.lib.licenses.lgpl2Plus;
 
-    maintainers = with stdenv.lib.maintainers; [ raskin urkud ];
+    maintainers = with stdenv.lib.maintainers; [ raskin ];
     platforms = stdenv.lib.platforms.linux ++ stdenv.lib.platforms.darwin;
   };
 

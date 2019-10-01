@@ -1,17 +1,21 @@
-{ stdenv, fetchurl, pkgconfig, gtk2, libpng, exiv2, lcms
-, intltool, gettext, shared_mime_info, glib, gdk_pixbuf, perl}:
+{ stdenv, fetchFromGitHub, autoreconfHook, pkgconfig, gtk2, libpng, exiv2, lcms
+, intltool, gettext, shared-mime-info, glib, gdk-pixbuf, perl}:
 
 stdenv.mkDerivation rec {
-  name = "viewnior-1.4";
+  pname = "viewnior";
+  version = "1.6";
 
-  src = fetchurl {
-    url = "https://www.dropbox.com/s/zytq0suabesv933/${name}.tar.gz";
-    sha256 = "0vv1133phgfzm92md6bbccmcvfiqb4kz28z1572c0qj971yz457a";
+  src = fetchFromGitHub {
+    owner = "xsisqox";
+    repo = "Viewnior";
+    rev = "${pname}-${version}";
+    sha256 = "06ppv3r85l3id4ij6h4y5fgm3nib2587fdrdv9fccyi75zk7fs0p";
   };
 
+  nativeBuildInputs = [ autoreconfHook ];
   buildInputs =
     [ pkgconfig gtk2 libpng exiv2 lcms intltool gettext
-      shared_mime_info glib gdk_pixbuf perl
+      shared-mime-info glib gdk-pixbuf perl
     ];
 
   preFixup = ''
@@ -19,7 +23,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = {
-    description = "Viewnior is a fast and simple image viewer for GNU/Linux";
+    description = "Fast and simple image viewer";
     longDescription =
       '' Viewnior is insipred by big projects like Eye of Gnome, because of it's
          usability and richness,and by GPicView, because of it's lightweight design and
@@ -28,12 +32,12 @@ stdenv.mkDerivation rec {
          in mind (follows Gnome HIG2).
       '';
 
-    license = "GPLv3";
+    license = stdenv.lib.licenses.gpl3;
 
-    homepage = http://xsisqox.github.com/Viewnior;
+    homepage = http://siyanpanayotov.com/project/viewnior/;
 
     maintainers = [ stdenv.lib.maintainers.smironov ];
 
-    platforms = stdenv.lib.platforms.gnu;
+    platforms = stdenv.lib.platforms.gnu ++ stdenv.lib.platforms.linux;
   };
 }

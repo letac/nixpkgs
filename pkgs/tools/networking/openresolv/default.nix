@@ -1,11 +1,12 @@
 { stdenv, fetchurl, makeWrapper, coreutils }:
 
 stdenv.mkDerivation rec {
-  name = "openresolv-3.5.7";
+  pname = "openresolv";
+  version = "3.9.1";
 
   src = fetchurl {
-    url = "http://roy.marples.name/downloads/openresolv/${name}.tar.bz2";
-    sha256 = "14n51wqnh49zdvx11l79s3fh1jhg7kg9cfny5vk7zsix78spmyx7";
+    url = "mirror://roy/openresolv/${pname}-${version}.tar.xz";
+    sha256 = "1wlzi88837rf4ygswmzpbcmgkbbjhn5n322n9q6ir6x367hygf1q";
   };
 
   buildInputs = [ makeWrapper ];
@@ -17,9 +18,9 @@ stdenv.mkDerivation rec {
       SYSCONFDIR=/etc
       SBINDIR=$out/sbin
       LIBEXECDIR=$out/libexec/resolvconf
-      VARDIR=/var/run/resolvconf
+      VARDIR=/run/resolvconf
       MANDIR=$out/share/man
-      RESTARTCMD="false \1"
+      RESTARTCMD=false
       EOF
     '';
 
@@ -31,8 +32,8 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "A program to manage /etc/resolv.conf";
-    homepage = http://roy.marples.name/projects/openresolv;
-    license = "bsd";
+    homepage = https://roy.marples.name/projects/openresolv;
+    license = stdenv.lib.licenses.bsd2;
     maintainers = [ stdenv.lib.maintainers.eelco ];
     platforms = stdenv.lib.platforms.linux;
   };

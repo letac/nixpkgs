@@ -1,39 +1,48 @@
-{ stdenv, fetchurl, python, wrapPython, distutils-cfg }:
+{ stdenv
+, buildPythonPackage
+, fetchPypi
+, python
+, wrapPython
+, unzip
+, callPackage
+, bootstrapped-pip
+}:
 
-stdenv.mkDerivation rec {
-  shortName = "setuptools-${version}";
-  name = "${python.executable}-${shortName}";
+buildPythonPackage rec {
+  pname = "setuptools";
+  version = "41.2.0";
+  format = "other";
 
-  version = "2.1";
-
-  src = fetchurl {
-    url = "http://pypi.python.org/packages/source/s/setuptools/${shortName}.tar.gz";
-    sha256 = "1m8qjvj5bfbphdags5s6pgmvk3xnw509lgdlq9whkq5a9mgxf8m7";
+  src = fetchPypi {
+    inherit pname version;
+    extension = "zip";
+    sha256 = "66b86bbae7cc7ac2e867f52dc08a6bd064d938bac59dfec71b9b565dd36d6012";
   };
 
-  buildInputs = [ python wrapPython distutils-cfg ];
+  # There is nothing to build
+  dontBuild = true;
 
-  buildPhase = "${python}/bin/${python.executable} setup.py build";
+  nativeBuildInputs = [ bootstrapped-pip ];
 
-  installPhase =
-    ''
-      dst=$out/lib/${python.libPrefix}/site-packages
+  installPhase = ''
+      dst=$out/${python.sitePackages}
       mkdir -p $dst
-      PYTHONPATH="$dst:$PYTHONPATH"
-      ${python}/bin/${python.executable} setup.py install --prefix=$out --install-lib=$out/lib/${python.libPrefix}/site-packages
+      export PYTHONPATH="$dst:$PYTHONPATH"
+      ${python.pythonForBuild.interpreter} setup.py install --prefix=$out
       wrapPythonPrograms
-    '';
-
-  doCheck = stdenv.system != "x86_64-darwin";
-
-  checkPhase = ''
-    ${python}/bin/${python.executable} setup.py test
   '';
+
+  # Adds setuptools to nativeBuildInputs causing infinite recursion.
+  catchConflicts = false;
+
+  # Requires pytest, causing infinite recursion.
+  doCheck = false;
 
   meta = with stdenv.lib; {
     description = "Utilities to facilitate the installation of Python packages";
-    homepage = http://pypi.python.org/pypi/setuptools;
-    license = [ "PSF" "ZPL" ];
-    platforms = platforms.all;
-  };    
+    homepage = https://pypi.python.org/pypi/setuptools;
+    license = with licenses; [ psfl zpl20 ];
+    platforms = python.meta.platforms;
+    priority = 10;
+  };
 }

@@ -10,7 +10,7 @@ stdenv.mkDerivation rec {
   };
 
   buildPhase = ''
-    make posix
+    make CC=cc posix
   '';
 
   installPhase = ''
@@ -22,18 +22,18 @@ stdenv.mkDerivation rec {
   '';
 
   meta = {
-    description = "flvstreamer is an command-line RTMP client";
+    description = "Command-line RTMP client";
 
     longDescription =
       '' flvstreamer is an open source command-line RTMP client intended to 
          stream audio or video content from all types of flash or rtmp servers.
       '';
 
-    license = "GPLv2+";
+    license = stdenv.lib.licenses.gpl2Plus;
 
-    homepage = http://savannah.nongnu.org/projects/flvstreamer;
+    homepage = https://savannah.nongnu.org/projects/flvstreamer;
 
     maintainers = [ stdenv.lib.maintainers.thammers ];
-    platforms = stdenv.lib.platforms.linux;
+    platforms = with stdenv.lib.platforms; linux ++ darwin;
   };
 }

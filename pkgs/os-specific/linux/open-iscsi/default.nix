@@ -1,27 +1,40 @@
-{ stdenv, fetchurl, kernel}:
-let
-  pname = "open-iscsi-2.0-871";
-in stdenv.mkDerivation {
-  name = "${pname}-${kernel.version}";
-  
-  src = fetchurl {
-    url = "http://www.open-iscsi.org/bits/${pname}.tar.gz";
-    sha256 = "1jvx1agybaj4czhz41bz37as076spicsmlh5pjksvwl2mr38gsmw";
+{ stdenv, fetchFromGitHub, automake, autoconf, libtool, gettext
+, utillinux, openisns, openssl, kmod, perl, systemd, pkgconf
+}:
+
+stdenv.mkDerivation rec {
+  pname = "open-iscsi";
+  version = "2.0.878";
+
+  nativeBuildInputs = [ autoconf automake gettext libtool perl pkgconf ];
+  buildInputs = [ kmod openisns.lib openssl systemd utillinux ];
+
+  src = fetchFromGitHub {
+    owner = "open-iscsi";
+    repo = "open-iscsi";
+    rev = version;
+    sha256 = "0hkprlni0z1zdkrmhd897knyfws0l95bz67fgp0vvf63ag08b5ly";
   };
-  
-  KSRC = "${kernel.dev}/lib/modules/*/build";
+
   DESTDIR = "$(out)";
-  
+
+  NIX_LDFLAGS = "-lkmod -lsystemd";
+  NIX_CFLAGS_COMPILE = "-DUSE_KMOD";
+
   preConfigure = ''
-    sed -i 's|/usr/|/|' Makefile
+    sed -i 's|/usr|/|' Makefile
   '';
-  
-  patches = [./kernel.patch];
-  
-  meta = {
+
+  postInstall = ''
+    cp usr/iscsistart $out/sbin/
+    $out/sbin/iscsistart -v
+  '';
+
+  meta = with stdenv.lib; {
     description = "A high performance, transport independent, multi-platform implementation of RFC3720";
-    license = "GPLv2+";
-    homepage = http://www.open-iscsi.org;
-    broken = true;
+    license = licenses.gpl2;
+    homepage = https://www.open-iscsi.com;
+    platforms = platforms.linux;
+    maintainers = with maintainers; [ cleverca22 zaninime ];
   };
 }

@@ -1,34 +1,73 @@
-{ stdenv, fetchurl }:
-
+{ stdenv, fetchurl, buildPackages
+, name ? "luajit-${version}"
+, isStable
+, sha256
+, version
+, extraMeta ? {}
+, callPackage
+, self
+, packageOverrides ? (self: super: {})
+}:
+let
+  luaPackages = callPackage ../../lua-modules {lua=self; overrides=packageOverrides;};
+in
 stdenv.mkDerivation rec {
-  name    = "luajit-${version}";
-  version = "2.0.3";
-
+  inherit name version;
   src = fetchurl {
-    url    = "http://luajit.org/download/LuaJIT-${version}.tar.gz";
-    sha256 = "0ydxpqkmsn2c341j4r2v6r5r0ig3kbwv3i9jran3iv81s6r6rgjm";
+    url = "http://luajit.org/download/LuaJIT-${version}.tar.gz";
+    inherit sha256;
   };
 
-  enableParallelBuilding = true;
+  luaversion = "5.1";
 
-  patchPhase = ''
-    substituteInPlace Makefile \
-      --replace /usr/local $out
-  '' + stdenv.lib.optionalString (stdenv.gcc.libc != null)
-  ''
-    substituteInPlace Makefile \
-      --replace ldconfig ${stdenv.gcc.libc}/sbin/ldconfig
+  postPatch = ''
+    substituteInPlace Makefile --replace ldconfig :
   '';
 
   configurePhase = false;
-  buildFlags     = [ "amalg" ]; # Build highly optimized version
-  installPhase   = "make install PREFIX=$out";
 
-  meta = with stdenv.lib; {
-    description = "high-performance JIT compiler for Lua 5.1";
+  makeFlags = [
+    "PREFIX=$(out)"
+    "DEFAULT_CC=cc"
+    "CROSS=${stdenv.cc.targetPrefix}"
+    # TODO: when pointer size differs, we would need e.g. -m32
+    "HOST_CC=${buildPackages.stdenv.cc}/bin/cc"
+  ];
+  buildFlags = [ "amalg" ]; # Build highly optimized version
+  enableParallelBuilding = true;
+
+  postInstall = ''
+      ( cd "$out/include"; ln -s luajit-*/* . )
+      ln -s "$out"/bin/luajit-* "$out"/bin/lua
+    ''
+    + stdenv.lib.optionalString (!isStable) ''
+      ln -s "$out"/bin/luajit-* "$out"/bin/luajit
+    '';
+
+  LuaPathSearchPaths = [
+    "lib/lua/${luaversion}/?.lua" "share/lua/${luaversion}/?.lua"
+    "share/lua/${luaversion}/?/init.lua" "lib/lua/${luaversion}/?/init.lua"
+    "share/${name}/?.lua"
+  ];
+  LuaCPathSearchPaths = [ "lib/lua/${luaversion}/?.so" "share/lua/${luaversion}/?.so" ];
+  setupHook = luaPackages.lua-setup-hook LuaPathSearchPaths LuaCPathSearchPaths;
+
+  passthru = rec {
+    buildEnv = callPackage ../lua-5/wrapper.nix {
+      lua = self;
+      inherit (luaPackages) requiredLuaModules;
+    };
+    withPackages = import ../lua-5/with-packages.nix { inherit buildEnv luaPackages;};
+    pkgs = luaPackages;
+    interpreter = "${self}/bin/lua";
+  };
+
+  meta = with stdenv.lib; extraMeta // {
+    description = "High-performance JIT compiler for Lua 5.1";
     homepage    = http://luajit.org;
     license     = licenses.mit;
     platforms   = platforms.linux ++ platforms.darwin;
-    maintainers = [ maintainers.thoughtpolice ];
+    maintainers = with maintainers; [ thoughtpolice smironov vcunat andir ];
   };
 }
+

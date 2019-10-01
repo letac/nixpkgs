@@ -1,44 +1,74 @@
-{ stdenv, fetchurl, udev, intltool, pkgconfig, glib, xmlto
-, makeWrapper, pygobject, pygtk, docbook_xml_dtd_412, docbook_xsl
-, pythonDBus, libxml2, desktop_file_utils, libusb1, cups, pycups
+{ stdenv, fetchurl, udev, intltool, pkgconfig, glib, xmlto, wrapGAppsHook
+, docbook_xml_dtd_412, docbook_xsl
+, libxml2, desktop-file-utils, libusb1, cups, gdk-pixbuf, pango, atk, libnotify
+, gobject-introspection, libsecret
+, cups-filters
 , pythonPackages
-, withGUI ? true
 }:
 
 stdenv.mkDerivation rec {
-  name = "system-config-printer-1.3.12";
+  pname = "system-config-printer";
+  version = "1.5.11";
 
   src = fetchurl {
-    url = "http://cyberelk.net/tim/data/system-config-printer/1.3/${name}.tar.xz";
-    sha256 = "1cg9n75rg5l9vr1925n2g771kga33imikyl0mf70lww2sfgvs18r";
+    url = "https://github.com/zdohnal/system-config-printer/releases/download/${version}/${pname}-${version}.tar.xz";
+    sha256 = "1lq0q51bhanirpjjvvh4xiafi8hgpk8r32h0dj6dn3f32z8pib9q";
   };
 
-  propagatedBuildInputs = [ pythonPackages.pycurl ];
+  patches = [ ./detect_serverbindir.patch ];
 
-  buildInputs =
-    [ intltool pkgconfig glib udev libusb1 cups xmlto
-      libxml2 docbook_xml_dtd_412 docbook_xsl desktop_file_utils
-      pythonPackages.python pythonPackages.wrapPython
-    ];
+  buildInputs = [
+    glib udev libusb1 cups
+    pythonPackages.python
+    libnotify gobject-introspection gdk-pixbuf pango atk
+    libsecret
+  ];
 
-  pythonPath =
-    [ pythonDBus pycups pygobject pythonPackages.pycurl ]
-    ++ stdenv.lib.optionals withGUI [ pygtk pythonPackages.notify ];
+  nativeBuildInputs = [
+    intltool pkgconfig
+    xmlto libxml2 docbook_xml_dtd_412 docbook_xsl desktop-file-utils
+    pythonPackages.wrapPython
+    wrapGAppsHook
+  ];
 
-  configureFlags =
-    [ "--with-udev-rules"
-      "--with-systemdsystemunitdir=$(out)/etc/systemd/system"
-    ];
+  pythonPath = with pythonPackages; requiredPythonModules [ pycups pycurl dbus-python pygobject3 requests pycairo pysmbc ];
+
+  configureFlags = [
+    "--with-udev-rules"
+    "--with-udevdir=$(out)/etc/udev"
+    "--with-systemdsystemunitdir=$(out)/etc/systemd/system"
+  ];
+
+  stripDebugList = [ "bin" "lib" "etc/udev" ];
+
+  doCheck = false; # generates shebangs in check phase, too lazy to fix
 
   postInstall =
     ''
-      wrapPythonPrograms
-      ( cd $out/share/system-config-printer/troubleshoot
-        mv .__init__.py-wrapped __init__.py
+      buildPythonPath "$out $pythonPath"
+      gappsWrapperArgs+=(
+        --prefix PATH : "$program_PATH"
+        --set CUPS_DATADIR "${cups-filters}/share/cups"
       )
+
+      find $out/share/system-config-printer -name \*.py -type f -perm -0100 -print0 | while read -d "" f; do
+        patchPythonScript "$f"
+      done
+
+      # The below line will be unneeded when the next upstream release arrives.
+      sed -i -e "s|/usr/local/bin|$out/bin|" "$out/share/dbus-1/services/org.fedoraproject.Config.Printing.service"
+
+      # Manually expand literal "$(out)", which have failed to expand
+      sed -e "s|ExecStart=\$(out)|ExecStart=$out|" \
+          -i "$out/etc/systemd/system/configure-printer@.service"
+
+      substituteInPlace $out/etc/udev/rules.d/70-printers.rules \
+        --replace "udev-configure-printer" "$out/etc/udev/udev-configure-printer"
     '';
 
   meta = {
     homepage = http://cyberelk.net/tim/software/system-config-printer/;
+    platforms = stdenv.lib.platforms.linux;
+    license = stdenv.lib.licenses.gpl2;
   };
 }

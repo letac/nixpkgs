@@ -1,11 +1,12 @@
 { stdenv, fetchurl, ncurses }:
 
-stdenv.mkDerivation {
-  name = "multitail-5.2.13";
+stdenv.mkDerivation rec {
+  version = "6.4.2";
+  pname = "multitail";
 
   src = fetchurl {
-    url = http://www.vanheusden.com/multitail/multitail-5.2.13.tgz;
-    sha256 = "1axgbdm1xkg570j0p150492x7p3mf11shwvn6dz8g4rha7cak4l6";
+    url = "https://www.vanheusden.com/multitail/${pname}-${version}.tgz";
+    sha256 = "1zd1r89xkxngl1pdrvsc877838nwkfqkbcgfqm3vglwalxc587dg";
   };
 
   buildInputs = [ ncurses ];
@@ -13,12 +14,15 @@ stdenv.mkDerivation {
   makeFlags = stdenv.lib.optionalString stdenv.isDarwin "-f makefile.macosx";
 
   installPhase = ''
-    ensureDir $out/bin
+    mkdir -p $out/bin
     cp multitail $out/bin
   '';
 
   meta = {
     homepage = http://www.vanheusden.com/multitail/;
     description = "tail on Steroids";
+    maintainers = with stdenv.lib.maintainers; [ matthiasbeyer ];
+    platforms = stdenv.lib.platforms.unix;
+    license = stdenv.lib.licenses.gpl2Plus;
   };
 }

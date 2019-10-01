@@ -1,26 +1,37 @@
-{stdenv, fetchurl, yasm}:
+{ stdenv, fetchurl, nasm }:
 
 stdenv.mkDerivation rec {
-  version = "snapshot-20130424-2245-stable";
-  name = "x264-20130424_2245";
+  pname = "x264";
+  version = "20190517-2245";
 
   src = fetchurl {
-    url = "ftp://ftp.videolan.org/pub/videolan/x264/snapshots/x264-${version}.tar.bz2";
-    sha256 = "0vzyqsgrm9k3hzka2p8ib92jl0ha8d4267r2rb3pr9gmpjaj9azk";
+    url = "https://download.videolan.org/x264/snapshots/x264-snapshot-${version}-stable.tar.bz2";
+    sha256 = "1xv41z04km3rf374xk3ny7v8ibr211ph0j5am0909ln63mphc48f";
   };
 
-  patchPhase = ''
-    sed -i s,/bin/bash,${stdenv.shell}, configure version.sh
+  postPatch = ''
+    patchShebangs .
+  '';
+
+  enableParallelBuilding = true;
+
+  outputs = [ "out" "lib" "dev" ];
+
+  preConfigure = ''
+    # `AS' is set to the binutils assembler, but we need nasm
+    unset AS
   '';
 
   configureFlags = [ "--enable-shared" ]
     ++ stdenv.lib.optional (!stdenv.isi686) "--enable-pic";
 
-  buildInputs = [ yasm ];
+  nativeBuildInputs = [ nasm ];
 
-  meta = {
-    description = "library for encoding H264/AVC video streams";
-    homepage = http://www.videolan.org/developers/x264.html;
-    license = "GPL";
+  meta = with stdenv.lib; {
+    description = "Library for encoding H264/AVC video streams";
+    homepage    = http://www.videolan.org/developers/x264.html;
+    license     = licenses.gpl2;
+    platforms   = platforms.unix;
+    maintainers = with maintainers; [ spwhitt tadeokondrak ];
   };
 }

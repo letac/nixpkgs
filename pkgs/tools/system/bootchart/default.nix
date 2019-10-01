@@ -1,37 +1,31 @@
-{stdenv, fetchurl, gnutar, gzip, coreutils, utillinux, gnugrep, gnused, psmisc, nettools}:
+{stdenv, fetchFromGitHub, pkgconfig, glib, gtk2, python2Packages }:
 
 stdenv.mkDerivation rec {
-  name = "bootchart-0.9";
+  version = "0.14.8";
+  pname = "bootchart";
 
-  src = fetchurl {
-    url = "mirror://sourceforge/bootchart/${name}.tar.bz2";
-    sha256 = "0z9jvi7cyp3hpx6hf1fyaa8fhnaz7aqid8wrkwp29cngryg3jf3p";
+  src = fetchFromGitHub {
+    owner = "mmeeks";
+    repo = "bootchart";
+    rev = version;
+    sha256 = "12ja2hp6f49416zfjdx0kjfmlkh9wl9b7wz7gk372kps4gjnypqx";
   };
 
-  buildInputs = [ gnutar gzip coreutils utillinux gnugrep gnused psmisc nettools ];
-
-  patchPhase = ''
-    export MYPATH=
-    for i in $buildInputs; do
-       export MYPATH=''${MYPATH}''${MYPATH:+:}$i/bin:$i/sbin
-    done
-
-    sed -i -e 's,PATH.*,PATH='$MYPATH, \
-       -e 's,^CONF.*,CONF='$out/etc/bootchartd.conf, \
-      script/bootchartd
-  '';
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ glib gtk2 python2Packages.python python2Packages.wrapPython python2Packages.pygtk ];
+  pythonPath = with python2Packages; [ pygtk pycairo ];
 
   installPhase = ''
-    mkdir -p $out/sbin $out/etc
-    cp script/bootchartd $out/sbin
-    cp script/bootchartd.conf $out/etc
-    chmod +x $out/sbin/bootchartd
+    make install DESTDIR=$out BINDIR=/bin PY_LIBDIR=/lib/${python2Packages.python.libPrefix}
+    wrapProgram $out/bin/pybootchartgui \
+      --prefix PYTHONPATH : "$PYTHONPATH:$(toPythonPath $out)"
   '';
 
-  meta = {
+  meta = with stdenv.lib; {
     homepage = http://www.bootchart.org/;
     description = "Performance analysis and visualization of the GNU/Linux boot process";
-    license="GPLv2+";
+    license = licenses.gpl2Plus;
+    platforms = platforms.linux;
   };
 
 }

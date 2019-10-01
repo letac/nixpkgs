@@ -1,4 +1,4 @@
-{ fetchurl, stdenv, pkgconfig, gettext, gtk, gconf
+{ fetchurl, stdenv, pkgconfig, gettext, gtk2, gconf
 , curl, libexif, sqlite, libxml2 }:
 
 stdenv.mkDerivation rec {
@@ -9,7 +9,9 @@ stdenv.mkDerivation rec {
     sha256 = "15q2kkrv4mfsivfdzjgpxr7s2amw7d501q2ayjl3ff4vmvfn5516";
   };
 
-  buildInputs = [ pkgconfig gettext gtk gconf curl libexif sqlite libxml2 ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ gettext gtk2 gconf curl libexif sqlite libxml2 ];
+  NIX_LDFLAGS = [ "-lm" ];
 
   # bogus includes fail with newer library version
   postPatch = ''
@@ -18,7 +20,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = {
-    description = "tangoGPS, a user friendly map and GPS user interface";
+    description = "User friendly map and GPS user interface";
 
     longDescription = ''
       tangoGPS is an easy to use, fast and lightweight mapping
@@ -38,6 +40,7 @@ stdenv.mkDerivation rec {
 
     #homepage = http://www.tangogps.org/; # no longer valid, I couldn't find any other
 
-    license = "GPLv2+";
+    license = stdenv.lib.licenses.gpl2Plus;
+    platforms = stdenv.lib.platforms.unix;
   };
 }

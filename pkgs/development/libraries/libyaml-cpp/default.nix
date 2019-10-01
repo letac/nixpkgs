@@ -1,18 +1,27 @@
-{stdenv, fetchurl, cmake, boostHeaders}:
+{ stdenv, fetchFromGitHub, cmake }:
 
-stdenv.mkDerivation {
-  name = "libyaml-cpp-0.5.1";
+stdenv.mkDerivation rec {
+  pname = "libyaml-cpp";
+  version = "0.6.2";
 
-  src = fetchurl {
-    url = http://yaml-cpp.googlecode.com/files/yaml-cpp-0.5.1.tar.gz;
-    sha256 = "01kg0h8ksp162kdhyzn67vnlxpj5zjbks84sh50pv61xni990z1y";
+  src = fetchFromGitHub {
+    owner = "jbeder";
+    repo = "yaml-cpp";
+    rev = "yaml-cpp-${version}";
+    sha256 = "16lclpa487yghf9019wymj419wkyx4795wv9q7539hhimajw9kpb";
   };
 
-  buildInputs = [ cmake boostHeaders ];
+  outputs = [ "out" "dev" ];
 
-  meta = {
-    homepage = http://code.google.com/p/yaml-cpp/;
+  nativeBuildInputs = [ cmake ];
+
+  cmakeFlags = "-DBUILD_SHARED_LIBS=ON -DYAML_CPP_BUILD_TESTS=OFF";
+
+  meta = with stdenv.lib; {
+    inherit (src.meta) homepage;
     description = "A YAML parser and emitter for C++";
-    license = "MIT";
+    license = licenses.mit;
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ andir ];
   };
 }

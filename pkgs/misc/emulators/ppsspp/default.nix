@@ -1,34 +1,45 @@
-{ stdenv, fetchgit, zlib, libpng, qt4, pkgconfig
-, withGamepads ? true, SDL # SDL is used for gamepad functionality
-}:
+{ stdenv, fetchFromGitHub, cmake, pkgconfig, qtbase, qtmultimedia
+, glew, libzip, snappy, zlib, withGamepads ? true, SDL2 }:
 
-let
-  version = "0.9.8";
-  fstat = x: fn: "-D" + fn + "=" + (if x then "ON" else "OFF");
-in stdenv.mkDerivation {
-  name = "PPSSPP-${version}";
+assert withGamepads -> (SDL2 != null);
+with stdenv.lib;
 
-  src = fetchgit {
-    url = "https://github.com/hrydgard/ppsspp.git";
-    sha256 = "11sqhb2m3502dzbizahh1w2dl7jv3fipwxyrmryj8fyaqqw0i36q";
-    rev = "cbc46be3f91cb8558fbb4b175b14e8e16cbf0243";
+stdenv.mkDerivation rec {
+  pname = "ppsspp";
+  version = "1.4.2";
+
+  src = fetchFromGitHub {
+    owner = "hrydgard";
+    repo = "ppsspp";
+    rev = "v${version}";
     fetchSubmodules = true;
+    sha256 = "0m4qkhx7q496sm7ibg2n7rm3npxzfr93iraxgndk0vhfk8vy8w75";
   };
 
-  # Upstream forgot to bump a version in one file.
-  patches = [ ./bump-version-to-0.9.8.patch ];
+  patchPhase = ''
+    echo 'const char *PPSSPP_GIT_VERSION = "${src.rev}";' >> git-version.cpp
+    substituteInPlace UI/NativeApp.cpp --replace /usr/share $out/share
+  '';
 
-  buildInputs = [ zlib libpng pkgconfig qt4 ]
-                ++ (if withGamepads then [ SDL ] else [ ]);
+  nativeBuildInputs = [ cmake pkgconfig ];
+  buildInputs = [ qtbase qtmultimedia glew libzip snappy zlib ]
+    ++ optionals withGamepads [ SDL2 SDL2.dev ];
 
-  configurePhase = "cd Qt && qmake PPSSPPQt.pro";
-  installPhase = "mkdir -p $out/bin && cp PPSSPPQt $out/bin";
+  cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" "-DUSING_QT_UI=ON" ];
 
-  meta = with stdenv.lib; {
-    homepage = "http://www.ppsspp.org/";
-    description = "A PSP emulator, the Qt4 version.";
+  installPhase = ''
+    mkdir -p $out/bin $out/share/ppsspp
+    mv PPSSPPQt $out/bin/ppsspp
+    mv assets $out/share/ppsspp
+  '';
+
+  enableParallelBuilding = true;
+
+  meta = {
+    homepage = https://www.ppsspp.org/;
+    description = "A PSP emulator for Android, Windows, Mac and Linux, written in C++";
     license = licenses.gpl2Plus;
-    maintainers = [ maintainers.fuuzetsu ];
+    maintainers = with maintainers; [ fuuzetsu AndersonTorres ];
     platforms = platforms.linux ++ platforms.darwin ++ platforms.cygwin;
   };
 }

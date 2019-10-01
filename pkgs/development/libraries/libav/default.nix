@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, pkgconfig, yasm, bzip2, zlib
+{ stdenv, fetchurl, pkgconfig, yasm, bzip2, zlib, perl, bash
 , mp3Support    ? true,   lame      ? null
 , speexSupport  ? true,   speex     ? null
 , theoraSupport ? true,   libtheora ? null
@@ -7,61 +7,83 @@
 , x264Support   ? false,  x264      ? null
 , xvidSupport   ? true,   xvidcore  ? null
 , faacSupport   ? false,  faac      ? null
-, vaapiSupport  ? false,  libva     ? null # ToDo: it has huge closure
+, vaapiSupport  ? true,   libva     ? null
 , vdpauSupport  ? true,   libvdpau  ? null
 , freetypeSupport ? true, freetype  ? null # it's small and almost everywhere
-, SDL # only for avplay in $tools, adds nontrivial closure to it
+, SDL # only for avplay in $bin, adds nontrivial closure to it
 , enableGPL ? true # ToDo: some additional default stuff may need GPL
 , enableUnfree ? faacSupport
 }:
 
 assert faacSupport -> enableUnfree;
 
-with { inherit (stdenv.lib) optional optionals; };
+let inherit (stdenv.lib) optional hasPrefix enableFeature; in
 
 /* ToDo:
-    - more deps, inspiration: http://packages.ubuntu.com/raring/libav-tools
+    - more deps, inspiration: https://packages.ubuntu.com/raring/libav-tools
     - maybe do some more splitting into outputs
 */
 
 let
   result = {
-    libav_0_8 = libavFun "0.8.12" "0069zv9s0f4silzdyjac87g7a89jhh27sadd1zcr9xngxbvd93fr";
-    libav_9   = libavFun   "9.13" "1jp6vlza5srks1scgl000x9y1y0l88inrcby4yxv6n92rpv5vw1g";
-    libav_10  = libavFun  "10.1"  "05cy1yq9rxarajs9gfdhkji8gmcpar125xi8lrx4cfplmp4lvq6m";
+    # e.g. https://libav.org/releases/libav-11.11.tar.xz.sha1
+    libav_0_8 = libavFun "0.8.21" "d858f65128dad0bac1a8c3a51e5cbb27a7c79b3f";
+    libav_11  = libavFun "11.12"  "61d5dcab5fde349834af193a572b12a5fd6a4d42";
+    libav_12  = libavFun "12.3"   "386c18c8b857f23dfcf456ce40370716130211d9";
   };
 
-  libavFun = version : sha256 : stdenv.mkDerivation rec {
-    name = "libav-${version}";
+  libavFun = version : sha1 : stdenv.mkDerivation rec {
+    pname = "libav";
+    inherit version;
 
     src = fetchurl {
-      url = "${meta.homepage}/releases/${name}.tar.xz";
-      inherit sha256;
+      url = "${meta.homepage}/releases/${pname}-${version}.tar.xz";
+      inherit sha1; # upstream directly provides sha1 of releases over https
     };
-    configureFlags =
-      assert stdenv.lib.all (x: x!=null) buildInputs;
-    [
+
+    patches = []
+      ++ optional (vpxSupport && hasPrefix "0.8." version) ./vpxenc-0.8.17-libvpx-1.5.patch
+      ;
+
+    postPatch = ''
+      patchShebangs .
+      # another shebang was hidden in a here document text
+      substituteInPlace ./configure --replace "#! /bin/sh" "#!${bash}/bin/sh"
+    '';
+
+    configurePlatforms = [];
+    configureFlags = assert stdenv.lib.all (x: x!=null) buildInputs; [
+      "--arch=${stdenv.hostPlatform.parsed.cpu.name}"
+      "--target_os=${stdenv.hostPlatform.parsed.kernel.name}"
       #"--enable-postproc" # it's now a separate package in upstream
       "--disable-avserver" # upstream says it's in a bad state
       "--enable-avplay"
       "--enable-shared"
       "--enable-runtime-cpudetect"
-    ]
-      ++ optionals enableGPL [ "--enable-gpl" "--enable-swscale" ]
-      ++ optional mp3Support "--enable-libmp3lame"
-      ++ optional speexSupport "--enable-libspeex"
-      ++ optional theoraSupport "--enable-libtheora"
-      ++ optional vorbisSupport "--enable-libvorbis"
-      ++ optional vpxSupport "--enable-libvpx"
-      ++ optional x264Support "--enable-libx264"
-      ++ optional xvidSupport "--enable-libxvid"
-      ++ optional faacSupport "--enable-libfaac --enable-nonfree"
-      ++ optional vaapiSupport "--enable-vaapi"
-      ++ optional vdpauSupport "--enable-vdpau"
-      ++ optional freetypeSupport "--enable-libfreetype"
-      ;
+      "--cc=cc"
+      (enableFeature enableGPL "gpl")
+      (enableFeature enableGPL "swscale")
+      (enableFeature mp3Support "libmp3lame")
+      (enableFeature mp3Support "libmp3lame")
+      (enableFeature speexSupport "libspeex")
+      (enableFeature theoraSupport "libtheora")
+      (enableFeature vorbisSupport "libvorbis")
+      (enableFeature vpxSupport "libvpx")
+      (enableFeature x264Support "libx264")
+      (enableFeature xvidSupport "libxvid")
+      (enableFeature faacSupport "libfaac")
+      (enableFeature faacSupport "nonfree")
+      (enableFeature vaapiSupport "vaapi")
+      (enableFeature vdpauSupport "vdpau")
+      (enableFeature freetypeSupport "libfreetype")
+    ] ++ optional (stdenv.hostPlatform != stdenv.buildPlatform) [
+      "--cross-prefix=${stdenv.cc.targetPrefix}"
+      "--enable-cross-compile"
+    ];
 
-    buildInputs = [ pkgconfig lame yasm zlib bzip2 SDL ]
+  nativeBuildInputs = [ pkgconfig perl ];
+    buildInputs = [ lame yasm zlib bzip2 SDL bash ]
+      ++ [ perl ] # for install-man target
       ++ optional mp3Support lame
       ++ optional speexSupport speex
       ++ optional theoraSupport libtheora
@@ -77,38 +99,34 @@ let
 
     enableParallelBuilding = true;
 
-    outputs = [ "out" "tools" ];
+    outputs = [ "bin" "dev" "out" ];
+    setOutputFlags = false;
+
+    # alltools to build smaller tools, incl. aviocat, ismindex, qt-faststart, etc.
+    buildFlags = "all alltools install-man";
+
 
     postInstall = ''
-      mkdir -p "$tools/bin"
-      mv "$out/bin/avplay" "$tools/bin"
-      cp -s "$out"/bin/* "$tools/bin/"
+      moveToOutput bin "$bin"
+      # alltools target compiles an executable in tools/ for every C
+      # source file in tools/, so move those to $out
+      for tool in $(find tools -type f -executable); do
+        mv "$tool" "$bin/bin/"
+      done
     '';
 
     doInstallCheck = false; # fails randomly
     installCheckTarget = "check"; # tests need to be run *after* installation
 
-    crossAttrs = {
-      dontSetConfigureCross = true;
-      configureFlags = configureFlags ++ [
-        "--cross-prefix=${stdenv.cross.config}-"
-        "--enable-cross-compile"
-        "--target_os=linux"
-        "--arch=${stdenv.cross.arch}"
-        ];
-    };
-
     passthru = { inherit vdpauSupport; };
 
     meta = with stdenv.lib; {
-      homepage = http://libav.org/;
+      homepage = https://libav.org/;
       description = "A complete, cross-platform solution to record, convert and stream audio and video (fork of ffmpeg)";
       license = with licenses; if enableUnfree then unfree #ToDo: redistributable or not?
         else if enableGPL then gpl2Plus else lgpl21Plus;
-      platforms = platforms.all;
-      maintainers = [ maintainers.vcunat ];
+      platforms = with platforms; linux ++ darwin;
     };
   }; # libavFun
 
 in result
-

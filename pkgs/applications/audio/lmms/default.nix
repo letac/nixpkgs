@@ -1,26 +1,49 @@
-{ stdenv, fetchurl, SDL, alsaLib, cmake, fftwSinglePrec, jackaudio, libogg
-, libsamplerate, libsndfile, pkgconfig, pulseaudio, qt4
-}:
+{ stdenv, fetchFromGitHub, cmake, pkgconfig, alsaLib ? null, fftwFloat, fltk13
+, fluidsynth_1 ? null, lame ? null, libgig ? null, libjack2 ? null, libpulseaudio ? null
+, libsamplerate, libsoundio ? null, libsndfile, libvorbis ? null, portaudio ? null
+, qtbase, qtx11extras, qttools, SDL ? null }:
 
-stdenv.mkDerivation  rec {
-  name = "lmms-${version}";
-  version = "0.4.15";
+stdenv.mkDerivation rec {
+  pname = "lmms";
+  version = "1.2.0-rc7";
 
-  src = fetchurl {
-    url = "mirror://sourceforge/lmms/${name}.tar.bz2";
-    sha256 = "02q2gbsqwk3hf9kvzz58a5bxmlb4cfr2mzy41wdvbxxdm2pcl101";
+  src = fetchFromGitHub {
+    owner = "LMMS";
+    repo = "lmms";
+    rev = "v${version}";
+    sha256 = "1hshzf2sbdfw37y9rz1ksgvn81kp2n23dp74lsaasc2n7wzjwdis";
+    fetchSubmodules = true;
   };
 
+  nativeBuildInputs = [ cmake qttools pkgconfig ];
+
   buildInputs = [
-    SDL alsaLib cmake fftwSinglePrec jackaudio libogg libsamplerate
-    libsndfile pkgconfig pulseaudio qt4
+    alsaLib
+    fftwFloat
+    fltk13
+    fluidsynth_1
+    lame
+    libgig
+    libjack2
+    libpulseaudio
+    libsamplerate
+    libsndfile
+    libsoundio
+    libvorbis
+    portaudio
+    qtbase
+    qtx11extras
+    SDL # TODO: switch to SDL2 in the next version
   ];
 
+  cmakeFlags = [ "-DWANT_QT5=ON" ];
+  enableParallelBuilding = true;
+
   meta = with stdenv.lib; {
-    description = "Linux MultiMedia Studio";
-    homepage = "http://lmms.sourceforge.net";
+    description = "DAW similar to FL Studio (music production software)";
+    homepage = https://lmms.io;
     license = licenses.gpl2Plus;
     platforms = platforms.linux;
-    maintainers = [ maintainers.goibhniu ];
+    maintainers = with maintainers; [ goibhniu yegortimoshenko ];
   };
 }

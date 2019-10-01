@@ -26,8 +26,8 @@ stdenv.mkDerivation rec {
 
     homepage = http://unfs3.sourceforge.net/;
 
-    license = "BSD";                              # 3-clause BSD
+    license = stdenv.lib.licenses.bsd3;
     platforms = stdenv.lib.platforms.unix;
-    maintainers = [ stdenv.lib.maintainers.ludo ];
+    maintainers = [ ];
   };
 }

@@ -1,25 +1,31 @@
-{ stdenv, fetchurl, pkgconfig, intltool, gtk, libxfce4util, libxfce4ui, xfce4panel
-, libwnck, dbus_glib, xfconf, libglade, xorg
-, polkit }:
+{ stdenv, fetchurl, pkgconfig, intltool, gtk, polkit
+, libxfce4util, libxfce4ui, xfce4-panel, libwnck, dbus-glib, xfconf, libglade, xorg
+, hicolor-icon-theme
+}:
 
-#TODO: gnome stuff: gconf (assistive?), keyring
-
-stdenv.mkDerivation rec {
+let
   p_name  = "xfce4-session";
-  ver_maj = "4.10";
+  ver_maj = "4.12";
   ver_min = "1";
+in
+stdenv.mkDerivation rec {
+  name = "${p_name}-${ver_maj}.${ver_min}";
 
   src = fetchurl {
     url = "mirror://xfce/src/xfce/${p_name}/${ver_maj}/${name}.tar.bz2";
-    sha256 = "10zwki7v55a325abr57wczcb5g7ml99cqk1p8ls8qycqqfyzlm01";
+    sha256 = "97d7f2a2d0af7f3623b68d1f04091e02913b28f9555dab8b0d26c8a1299d08fd";
   };
-  name = "${p_name}-${ver_maj}.${ver_min}";
+
+  patches = [
+    # Fix "lock screen" not working for light-locker
+    ./xfce4-light-locker.patch
+  ];
 
   buildInputs =
-    [ pkgconfig intltool gtk libxfce4util libxfce4ui libwnck dbus_glib
-      xfconf xfce4panel libglade xorg.iceauth
-      polkit
-    ];
+    [ pkgconfig intltool gtk libxfce4util libxfce4ui libwnck dbus-glib
+      xfconf xfce4-panel libglade xorg.iceauth xorg.libSM
+      polkit hicolor-icon-theme
+    ]; #TODO: upower-glib, gconf (assistive?), gnome keyring
 
   preBuild = ''
     sed '/^PATH=/d'        -i scripts/xflock4
@@ -28,13 +34,11 @@ stdenv.mkDerivation rec {
 
   configureFlags = [ "--with-xsession-prefix=$(out)" ];
 
-  preFixup = "rm $out/share/icons/hicolor/icon-theme.cache";
-
-  meta = {
-    homepage = http://www.xfce.org/projects/xfce4-session;
+  meta = with stdenv.lib; {
+    homepage = https://www.xfce.org/projects/xfce4-session;
     description = "Session manager for Xfce";
-    license = "GPLv2+";
-    platforms = stdenv.lib.platforms.linux;
-    maintainers = [ stdenv.lib.maintainers.eelco ];
+    license = licenses.gpl2Plus;
+    platforms = platforms.linux;
+    maintainers = [ maintainers.eelco ];
   };
 }

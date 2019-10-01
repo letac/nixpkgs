@@ -1,20 +1,27 @@
-{ stdenv, fetchurl, cmake, kdelibs, gettext }:
+{
+  mkDerivation, lib, fetchurl,
+  extra-cmake-modules, kdoctools, wrapGAppsHook,
+  kcrash, kconfig, kinit, kparts
+}:
 
-stdenv.mkDerivation rec {
-  name = "kdiff3-0.9.97";
+mkDerivation rec {
+  pname = "kdiff3";
+  version = "1.8.1";
+
   src = fetchurl {
-    url = "mirror://sourceforge/kdiff3/${name}.tar.gz";
-    sha256 = "0ajsnzfr0aqzdiv5wqssxsgfv87v4g5c2zl16264v0cw8jxiddz3";
+    url = "https://download.kde.org/stable/${pname}/${pname}-${version}.tar.xz";
+    sha256 = "0vj3rw5w0kry2c1y8gv6hniam417w7k3ydb1dkf5xwr4iprw0xvq";
   };
 
-  buildInputs = [ kdelibs ];
-  nativeBuildInputs = [ cmake gettext ];
+  nativeBuildInputs = [ extra-cmake-modules kdoctools wrapGAppsHook ];
 
-  meta = {
+  propagatedBuildInputs = [ kconfig kcrash kinit kparts ];
+
+  meta = with lib; {
     homepage = http://kdiff3.sourceforge.net/;
-    license = "GPLv2+";
+    license = licenses.gpl2Plus;
     description = "Compares and merges 2 or 3 files or directories";
-    maintainers = with stdenv.lib.maintainers; [viric urkud];
-    platforms = with stdenv.lib.platforms; linux;
+    maintainers = with maintainers; [ peterhoeg ];
+    platforms = with platforms; linux;
   };
 }

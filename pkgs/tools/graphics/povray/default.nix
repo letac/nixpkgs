@@ -1,25 +1,49 @@
-{stdenv, fetchurl}:
+{ stdenv, fetchFromGitHub, autoconf, automake, boost
+, zlib, libpng, libjpeg, libtiff, xlibsWrapper, SDL
+}:
 
-stdenv.mkDerivation {
-  name = "povray-3.6";
+stdenv.mkDerivation rec {
+  pname = "povray";
+  version = "3.7.0.8";
 
-  src = fetchurl {
-    url = http://www.povray.org/ftp/pub/povray/Old-Versions/Official-3.62/Unix/povray-3.6.tar.bz2;
-    sha256 = "4e8a7fecd44807343b6867e1f2440aa0e09613d6d69a7385ac48f4e5e7737a73";
+  src = fetchFromGitHub {
+    owner = "POV-Ray";
+    repo = "povray";
+    rev = "v${version}";
+    sha256 = "1q114n4m3r7qy3yn954fq7p46rg7ypdax5fazxr9yj1jklf1lh6z";
   };
+
+
+  buildInputs = [ autoconf automake boost zlib libpng libjpeg libtiff xlibsWrapper SDL ];
 
   # the installPhase wants to put files into $HOME. I let it put the files
   # to $TMPDIR, so they don't get into the $out
-  patchPhase = ''
-    sed -i -e 's/^povconfuser.*/povconfuser=$(TMPDIR)\/povray/' Makefile.{am,in};
+  postPatch = '' cd unix
+                 ./prebuild.sh
+                 cd ..
+                 sed -i -e 's/^povconfuser.*/povconfuser=$(TMPDIR)\/povray/' Makefile.{am,in}
+                 sed -i -e 's/^povuser.*/povuser=$(TMPDIR)\/.povray/' Makefile.{am,in}
+                 sed -i -e 's/^povowner.*/povowner=nobody/' Makefile.{am,in}
+                 sed -i -e 's/^povgroup.*/povgroup=nogroup/' Makefile.{am,in}
+               '';
+
+  configureFlags = [ "COMPILED_BY='nix'" "--with-boost-thread=boost_thread" "--with-x" ];
+
+  enableParallelBuilding = true;
+
+  preInstall = ''
+    mkdir "$TMP/bin"
+    for i in chown chgrp; do
+      echo '#!${stdenv.shell}' >> "$TMP/bin/$i"
+      chmod +x "$TMP/bin/$i"
+      PATH="$TMP/bin:$PATH"
+    done
   '';
-  # I didn't use configureFlags because I couldn't pass the quotes properly
-  # for the COMPILED_BY.
-  configurePhase = "./configure --prefix=$out COMPILED_BY=\"nix\"";
-  
-  meta = {
+
+  meta = with stdenv.lib; {
     homepage = http://www.povray.org/;
     description = "Persistence of Vision Raytracer";
-    license = "free";
+    license = licenses.free;
+    platforms = platforms.linux;
   };
 }

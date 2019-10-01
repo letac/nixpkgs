@@ -9,7 +9,7 @@ stdenv.mkDerivation rec {
   };
 
   meta = {
-    description = "data recovery tool for damaged hardware";
+    description = "Data recovery tool for damaged hardware";
 
     longDescription =
       '' Safecopy is a data recovery tool which tries to extract as much data as possible from a
@@ -22,9 +22,9 @@ stdenv.mkDerivation rec {
 
     homepage = http://safecopy.sourceforge.net;
 
-    license = "GPLv2+";
+    license = stdenv.lib.licenses.gpl2Plus;
 
-    platforms = stdenv.lib.platforms.all;
+    platforms = stdenv.lib.platforms.linux;
     maintainers = [ stdenv.lib.maintainers.bluescreen303 ];
   };
 }

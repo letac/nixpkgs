@@ -1,65 +1,111 @@
-{ stdenv, fetchurl, pkgconfig, audiofile
-, openglSupport ? false, mesa ? null
-, alsaSupport ? true, alsaLib ? null
-, x11Support ? true, x11 ? null, libXrandr ? null
-, pulseaudioSupport ? true, pulseaudio ? null
+{ stdenv, config, fetchurl, pkgconfig
+, libGLSupported ? stdenv.lib.elem stdenv.hostPlatform.system stdenv.lib.platforms.mesaPlatforms
+, openglSupport ? libGLSupported, libGL
+, alsaSupport ? stdenv.isLinux && !stdenv.hostPlatform.isAndroid, alsaLib
+, x11Support ? !stdenv.isCygwin && !stdenv.hostPlatform.isAndroid
+, libX11, xorgproto, libICE, libXi, libXScrnSaver, libXcursor
+, libXinerama, libXext, libXxf86vm, libXrandr
+, waylandSupport ? stdenv.isLinux && !stdenv.hostPlatform.isAndroid
+, wayland, wayland-protocols, libxkbcommon
+, dbusSupport ? stdenv.isLinux && !stdenv.hostPlatform.isAndroid, dbus
+, udevSupport ? false, udev
+, ibusSupport ? false, ibus
+, fcitxSupport ? false, fcitx
+, pulseaudioSupport ? config.pulseaudio or stdenv.isLinux && !stdenv.hostPlatform.isAndroid
+, libpulseaudio
+, AudioUnit, Cocoa, CoreAudio, CoreServices, ForceFeedback, OpenGL
+, audiofile, libiconv
 }:
 
-# OSS is no longer supported, for it's much crappier than ALSA and
-# PulseAudio.
-assert alsaSupport || pulseaudioSupport;
+# NOTE: When editing this expression see if the same change applies to
+# SDL expression too
 
-assert openglSupport -> (mesa != null && x11Support);
-assert x11Support -> (x11 != null && libXrandr != null);
-assert alsaSupport -> alsaLib != null;
-assert pulseaudioSupport -> pulseaudio != null;
+with stdenv.lib;
 
-let
-  configureFlagsFun = attrs: ''
-        --disable-oss --disable-x11-shared
-        --disable-pulseaudio-shared --disable-alsa-shared
-        ${if alsaSupport then "--with-alsa-prefix=${attrs.alsaLib}/lib" else ""}
-      '';
-in
 stdenv.mkDerivation rec {
-  name = "SDL2-2.0.3";
+  pname = "SDL2";
+  version = "2.0.10";
 
   src = fetchurl {
-    url = "http://www.libsdl.org/release/${name}.tar.gz";
-    sha256 = "0369ngvb46x6c26h8zva4x22ywgy6mvn0wx87xqwxg40pxm9m9m5";
+    url = "https://www.libsdl.org/release/${pname}-${version}.tar.gz";
+    sha256 = "0mqxp6w5jhbq6y1j690g9r3gpzwjxh4czaglw8x05l7hl49nqrdl";
   };
 
-  # Since `libpulse*.la' contain `-lgdbm', PulseAudio must be propagated.
-  propagatedBuildInputs = stdenv.lib.optionals x11Support [ x11 libXrandr ] ++
-    stdenv.lib.optional pulseaudioSupport pulseaudio;
+  outputs = [ "out" "dev" ];
+  outputBin = "dev"; # sdl-config
 
-  buildInputs = [ pkgconfig audiofile ] ++
-    stdenv.lib.optional openglSupport [ mesa ] ++
-    stdenv.lib.optional alsaSupport alsaLib;
+  patches = [ ./find-headers.patch ];
 
-  # https://bugzilla.libsdl.org/show_bug.cgi?id=1431
-  dontDisableStatic = true;
+  nativeBuildInputs = [ pkgconfig ];
 
-  # XXX: By default, SDL wants to dlopen() PulseAudio, in which case
-  # we must arrange to add it to its RPATH; however, `patchelf' seems
-  # to fail at doing this, hence `--disable-pulseaudio-shared'.
-  configureFlags = configureFlagsFun { inherit alsaLib; };
+  propagatedBuildInputs = dlopenPropagatedBuildInputs;
 
-  crossAttrs = {
-      configureFlags = configureFlagsFun { alsaLib = alsaLib.crossDrv; };
-  };
+  dlopenPropagatedBuildInputs = [ ]
+    # Propagated for #include <GLES/gl.h> in SDL_opengles.h.
+    ++ optional openglSupport libGL
+    # Propagated for #include <X11/Xlib.h> and <X11/Xatom.h> in SDL_syswm.h.
+    ++ optionals x11Support [ libX11 xorgproto ];
+
+  dlopenBuildInputs = [ ]
+    ++ optionals  alsaSupport [ alsaLib audiofile ]
+    ++ optional  dbusSupport dbus
+    ++ optional  pulseaudioSupport libpulseaudio
+    ++ optional  udevSupport udev
+    ++ optionals waylandSupport [ wayland wayland-protocols libxkbcommon ]
+    ++ optionals x11Support [ libICE libXi libXScrnSaver libXcursor libXinerama libXext libXrandr libXxf86vm ];
+
+  buildInputs = [ libiconv ]
+    ++ dlopenBuildInputs
+    ++ optional  ibusSupport ibus
+    ++ optional  fcitxSupport fcitx
+    ++ optionals stdenv.isDarwin [ AudioUnit Cocoa CoreAudio CoreServices ForceFeedback OpenGL ];
+
+  enableParallelBuilding = true;
+
+  configureFlags = [
+    "--disable-oss"
+  ] ++ optional (!x11Support) "--without-x"
+    ++ optional alsaSupport "--with-alsa-prefix=${alsaLib.out}/lib"
+    ++ optional stdenv.isDarwin "--disable-sdltest";
 
   postInstall = ''
+    moveToOutput lib/libSDL2main.a "$dev"
     rm $out/lib/*.a
+    moveToOutput bin/sdl2-config "$dev"
   '';
 
-  passthru = {inherit openglSupport;};
+  # SDL is weird in that instead of just dynamically linking with
+  # libraries when you `--enable-*` (or when `configure` finds) them
+  # it `dlopen`s them at runtime. In principle, this means it can
+  # ignore any missing optional dependencies like alsa, pulseaudio,
+  # some x11 libs, wayland, etc if they are missing on the system
+  # and/or work with wide array of versions of said libraries. In
+  # nixpkgs, however, we don't need any of that. Moreover, since we
+  # don't have a global ld-cache we have to stuff all the propagated
+  # libraries into rpath by hand or else some applications that use
+  # SDL API that requires said libraries will fail to start.
+  #
+  # You can grep SDL sources with `grep -rE 'SDL_(NAME|.*_SYM)'` to
+  # list the symbols used in this way.
+  postFixup = let
+    rpath = makeLibraryPath (dlopenPropagatedBuildInputs ++ dlopenBuildInputs);
+  in optionalString (stdenv.hostPlatform.extensions.sharedLibrary == ".so") ''
+    for lib in $out/lib/*.so* ; do
+      if ! [[ -L "$lib" ]]; then
+        patchelf --set-rpath "$(patchelf --print-rpath $lib):${rpath}" "$lib"
+      fi
+    done
+  '';
 
-  meta = {
+  setupHook = ./setup-hook.sh;
+
+  passthru = { inherit openglSupport; };
+
+  meta = with stdenv.lib; {
     description = "A cross-platform multimedia library";
     homepage = http://www.libsdl.org/;
-    license = stdenv.lib.licenses.zlib;
-    platforms = stdenv.lib.platforms.linux;
-    maintainers = [ stdenv.lib.maintainers.page ];
+    license = licenses.zlib;
+    platforms = platforms.all;
+    maintainers = with maintainers; [ cpages ];
   };
 }

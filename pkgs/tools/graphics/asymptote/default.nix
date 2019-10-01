@@ -1,71 +1,78 @@
-a @ {
-  freeglut,ghostscriptX,imagemagick,fftw,
-  boehmgc,mesa,ncurses,readline,gsl,libsigsegv,
-  python,zlib, perl, texLive, texinfo, xz,
+{stdenv, fetchurl, fetchpatch
+  , freeglut, ghostscriptX, imagemagick, fftw
+  , boehmgc, libGLU, libGL, mesa, ncurses, readline, gsl, libsigsegv
+  , python, zlib, perl, texLive, texinfo, xz
+, darwin
+}:
 
-  noDepEntry, fullDepEntry, fetchUrlFromSrcInfo,
-  lib,
-
-  ...}:
 let
   s = # Generated upstream information
   rec {
     baseName="asymptote";
-    version="2.32";
+    version="2.47";
     name="${baseName}-${version}";
-    hash="19cgn5158p42igjbp8lf6xdbh3yjhlkdm22m5lqrhibp09g06d90";
-    url="mirror://sourceforge/project/asymptote/2.32/asymptote-2.32.src.tgz";
-    sha256="19cgn5158p42igjbp8lf6xdbh3yjhlkdm22m5lqrhibp09g06d90";
+    hash="0zc24n2vwzxdfmcppqfk3fkqlb4jmvswzi3bz232kxl7dyiyb971";
+    url="https://freefr.dl.sourceforge.net/project/asymptote/2.47/asymptote-2.47.src.tgz";
+    sha256="0zc24n2vwzxdfmcppqfk3fkqlb4jmvswzi3bz232kxl7dyiyb971";
   };
-  buildInputs = with a; [
-    freeglut ghostscriptX imagemagick fftw boehmgc
-    mesa ncurses readline gsl libsigsegv python zlib
-    perl texLive texinfo xz
-  ];
+  buildInputs = [
+   ghostscriptX imagemagick fftw
+   boehmgc ncurses readline gsl libsigsegv
+   python zlib perl texLive texinfo xz ]
+   ++ stdenv.lib.optionals stdenv.isLinux
+     [ freeglut libGLU libGL mesa.osmesa ]
+   ++ stdenv.lib.optionals stdenv.isDarwin
+     (with darwin.apple_sdk.frameworks; [ OpenGL GLUT Cocoa ])
+   ;
 in
-rec {
-  src = a.fetchUrlFromSrcInfo s;
-
-  inherit (s) name;
+stdenv.mkDerivation {
+  inherit (s) name version;
   inherit buildInputs;
-  configureFlags = "--enable-gc=${a.boehmgc} --enable-offscreen";
 
-  /* doConfigure should be removed if not needed */
-  phaseNames = ["setVars" "doUnpack" "fixPaths" "extractTexinfoTex"
-    "doConfigure" "dumpRealVars" "doMakeInstall" "fixPathsResult"
-    "fixInfoDir"];
+  src = fetchurl {
+    inherit (s) url sha256;
+  };
 
-  setVars = a.noDepEntry ''
+  patches = [
+    # Remove when updating from 2.47 to 2.48
+    # Compatibility with BoehmGC 7.6.8
+    (fetchpatch {
+      url = "https://github.com/vectorgraphics/asymptote/commit/38a59370dc5ac720c29e1424614a10f7384b943f.patch";
+      sha256 = "0c3d11hzxxaqh24kfw9y8zvlid54kk40rx2zajx7jwl12gga05s1";
+    })
+  ];
+
+  preConfigure = ''
     export HOME="$PWD"
+    patchShebangs .
+    sed -e 's@epswrite@eps2write@g' -i runlabel.in
+    xz -d < ${texinfo.src} | tar --wildcards -x texinfo-'*'/doc/texinfo.tex
+    cp texinfo-*/doc/texinfo.tex doc/
+    rm *.tar.gz
+    configureFlags="$configureFlags --with-latex=$out/share/texmf/tex/latex --with-context=$out/share/texmf/tex/context/third"
   '';
 
-  dumpRealVars = a.noDepEntry ''
-    set > ../real-env-vars
-  '';
+  NIX_CFLAGS_COMPILE = [ "-I${boehmgc.dev}/include/gc" ];
 
-  fixPaths = a.doPatchShebangs ''.'';
-  fixPathsResult = a.doPatchShebangs ''$out/bin'';
-
-  fixInfoDir = a.noDepEntry ''
+  postInstall = ''
     mv -v "$out/share/info/asymptote/"*.info $out/share/info/
     sed -i -e 's|(asymptote/asymptote)|(asymptote)|' $out/share/info/asymptote.info
     rmdir $out/share/info/asymptote
     rm $out/share/info/dir
+
+    rm -rfv "$out"/share/texmf
+    mkdir -pv "$out"/share/emacs/site-lisp/${s.name}
+    mv -v "$out"/share/asymptote/*.el "$out"/share/emacs/site-lisp/${s.name}
   '';
 
-  extractTexinfoTex = a.fullDepEntry ''
-    xz -d < ${a.texinfo.src} | tar --wildcards -x texinfo-'*'/doc/texinfo.tex
-    cp texinfo-*/doc/texinfo.tex doc/
-  '' ["minInit" "addInputs" "doUnpack"];
+  enableParallelBuilding = true;
 
-  meta = {
+  meta = with stdenv.lib; {
     inherit (s) version;
-    description = "A tool for programming graphics intended to replace Metapost";
-    maintainers = [
-      a.lib.maintainers.raskin
-      a.lib.maintainers.simons
-    ];
-    platforms = with a.lib.platforms;
-      linux;
+    description =  "A tool for programming graphics intended to replace Metapost";
+    license = licenses.gpl3Plus;
+    maintainers = [ maintainers.raskin maintainers.peti ];
+    broken = stdenv.isDarwin;  # https://github.com/vectorgraphics/asymptote/issues/69
+    platforms = platforms.linux ++ platforms.darwin;
   };
 }

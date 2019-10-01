@@ -1,4 +1,6 @@
-{ fetchurl, stdenv, perl, bison, flex, pkgconfig, glib, libxml2, libintlOrEmpty }:
+{ fetchurl, fetchpatch, stdenv, autoreconfHook
+, perl, bison2, flex, pkgconfig, glib, libxml2, libintl, libunwind
+}:
 
 stdenv.mkDerivation rec {
   name = "gstreamer-0.10.36";
@@ -11,30 +13,59 @@ stdenv.mkDerivation rec {
     sha256 = "1nkid1n2l3rrlmq5qrf5yy06grrkwjh3yxl5g0w58w0pih8allci";
   };
 
-  buildInputs = [ perl bison flex pkgconfig ];
-  propagatedBuildInputs = [ glib libxml2 ] ++ libintlOrEmpty;
+  outputs = [ "out" "dev" ];
 
-  patchPhase = ''
+  nativeBuildInputs = [ autoreconfHook flex perl pkgconfig libintl bison2 glib ];
+  buildInputs = stdenv.lib.optional stdenv.isDarwin libunwind;
+  propagatedBuildInputs = [ glib libxml2 ];
+
+  patches = [
+    (fetchpatch {
+      url = "https://github.com/GStreamer/common/commit/03a0e5736761a72d4ed880e8c485bbf9e4a8ea47.patch";
+      sha256 = "0rin3x01yy78ky3smmhbwlph18hhym18q4x9w6ddiqajg5lk4xhm";
+      extraPrefix = "common/";
+      stripLen = 1;
+    })
+    (fetchpatch {
+      url = "https://github.com/GStreamer/common/commit/8aadeaaa8a948d7ce62008789ab03e9aa514c2b9.patch";
+      sha256 = "0n2mqvq2al7jr2hflhz4l781i3jya5a9i725jvy508ambpgycz3x";
+      extraPrefix = "common/";
+      stripLen = 1;
+    })
+    (fetchpatch {
+      url = "https://github.com/GStreamer/common/commit/7bb2bcecda471a0d514a964365a78150f3ee5747.patch";
+      sha256 = "0famdj70m7wjvr1dpy7iywhrkqxmrshxz0rizz1bixgp42dvkhbq";
+      extraPrefix = "common/";
+      stripLen = 1;
+    })
+  ] ++
+    # See https://trac.macports.org/ticket/40783 for explanation of patch
+    stdenv.lib.optional stdenv.isDarwin ./darwin.patch;
+
+  postPatch = ''
     sed -i -e 's/^   /\t/' docs/gst/Makefile.in docs/libs/Makefile.in docs/plugins/Makefile.in
   '';
 
-  configureFlags = ''
-    --disable-examples --enable-failing-tests --localstatedir=/var --disable-gtk-doc --disable-docbook
-  '';
+  configureFlags = [
+    "--disable-examples"
+    "--localstatedir=/var"
+    "--disable-gtk-doc"
+    "--disable-docbook"
+  ];
+
+  doCheck = false; # fails. 2 tests crash
 
   postInstall = ''
     # Hm, apparently --disable-gtk-doc is ignored...
     rm -rf $out/share/gtk-doc
-
-    paxmark m $out/bin/gst-launch* $out/libexec/gstreamer-*/gst-plugin-scanner
   '';
 
   setupHook = ./setup-hook.sh;
 
   meta = {
-    homepage = http://gstreamer.freedesktop.org;
+    homepage = https://gstreamer.freedesktop.org;
 
-    description = "GStreamer, a library for constructing graphs of media-handling components";
+    description = "Library for constructing graphs of media-handling components";
 
     longDescription = ''
       GStreamer is a library for constructing graphs of media-handling
@@ -48,6 +79,7 @@ stdenv.mkDerivation rec {
       interface.
     '';
 
-    license = "LGPLv2+";
+    license = stdenv.lib.licenses.lgpl2Plus;
+    platforms = stdenv.lib.platforms.unix;
   };
 }

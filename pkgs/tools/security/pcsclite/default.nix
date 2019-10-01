@@ -1,30 +1,48 @@
-{ stdenv, fetchurl, pkgconfig, udev, dbus_libs, perl }:
+{ stdenv, fetchurl, pkgconfig, udev, dbus, perl, python2
+, IOKit ? null }:
 
 stdenv.mkDerivation rec {
-  version = "1.8.11";
-  name = "pcsclite-${version}";
+  pname = "pcsclite";
+  version = "1.8.25";
+
+  outputs = [ "bin" "out" "dev" "doc" "man" ];
 
   src = fetchurl {
-    url = "https://alioth.debian.org/frs/download.php/file/3991/pcsc-lite-${version}.tar.bz2";
-    sha256 = "945041c94c53959ae5a767616a4ec5099fe67f549bfd344e8bd0cfe7a3c71ac6";
+    url = "https://pcsclite.apdu.fr/files/pcsc-lite-${version}.tar.bz2";
+    sha256 = "14l7irs1nsh8b036ag4cfy8wryyysch78scz5dw6xxqwqgnpjvfp";
   };
 
-  # The OS should care on preparing the drivers into this location
+  patches = [ ./no-dropdir-literals.patch ];
+
   configureFlags = [
+    # The OS should care on preparing the drivers into this location
     "--enable-usbdropdir=/var/lib/pcsc/drivers"
-    "--with-systemdsystemunitdir=$out/etc/systemd/system"
-    "--enable-confdir=$out/etc"
-  ];
+    "--enable-confdir=/etc"
+    "--enable-ipcdir=/run/pcscd"
+  ] ++ stdenv.lib.optional stdenv.isLinux
+         "--with-systemdsystemunitdir=\${out}/etc/systemd/system"
+    ++ stdenv.lib.optional (!stdenv.isLinux)
+         "--disable-libsystemd";
 
-  buildInputs = [ udev dbus_libs perl ];
+  postConfigure = ''
+    sed -i -re '/^#define *PCSCLITE_HP_DROPDIR */ {
+      s/(DROPDIR *)(.*)/\1(getenv("PCSCLITE_HP_DROPDIR") ? : \2)/
+    }' config.h
+  '';
 
-  nativeBuildInputs = [ pkgconfig ];
+  postInstall = ''
+    # pcsc-spy is a debugging utility and it drags python into the closure
+    moveToOutput bin/pcsc-spy "$dev"
+  '';
+
+  nativeBuildInputs = [ pkgconfig perl python2 ];
+  buildInputs = stdenv.lib.optionals stdenv.isLinux [ udev dbus ]
+             ++ stdenv.lib.optionals stdenv.isDarwin [ IOKit ];
 
   meta = with stdenv.lib; {
     description = "Middleware to access a smart card using SCard API (PC/SC)";
-    homepage = http://pcsclite.alioth.debian.org/;
+    homepage = https://pcsclite.apdu.fr/;
     license = licenses.bsd3;
-    maintainers = with maintainers; [viric];
-    platforms = with platforms; linux;
+    platforms = with platforms; unix;
   };
 }

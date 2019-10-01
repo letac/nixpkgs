@@ -1,17 +1,22 @@
-{ stdenv, fetchurl }:
+{ stdenv, autoreconfHook, fetchFromGitHub }:
 
-stdenv.mkDerivation {
-  name = "inotify-tools-3.13";
+stdenv.mkDerivation rec {
+  pname = "inotify-tools";
+  version = "3.20.1";
 
-  src = fetchurl {
-    url = mirror://sourceforge/inotify-tools/inotify-tools/3.13/inotify-tools-3.13.tar.gz;
-    sha256 = "0icl4bx041axd5dvhg89kilfkysjj86hjakc7bk8n49cxjn4cha6";
+  src = fetchFromGitHub {
+    repo = "inotify-tools";
+    owner = "rvoicilas";
+    rev = version;
+    sha256 = "14dci1i4mhsd5sa33k8h3ayphk19kizynh5ql9ryibdpmcanfiyq";
   };
 
-  meta = {
-    homepage = http://sourceforge.net/projects/inotify-tools/;
-    license = "GPLv2";
-    maintainers = [ stdenv.lib.maintainers.marcweber ];
-    platforms = stdenv.lib.platforms.linux;
+  nativeBuildInputs = [ autoreconfHook ];
+
+  meta = with stdenv.lib; {
+    homepage = https://github.com/rvoicilas/inotify-tools/wiki;
+    license = licenses.gpl2;
+    maintainers = with maintainers; [ marcweber pSub ];
+    platforms = platforms.linux;
   };
 }

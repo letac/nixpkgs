@@ -1,22 +1,23 @@
-{ stdenv, fetchurl, SDL, ftgl, pkgconfig, libpng, libjpeg, pcre, SDL_image, glew, mesa }:
+{ stdenv, fetchurl, SDL2, ftgl, pkgconfig, libpng, libjpeg, pcre, SDL2_image, glew
+, libGLU_combined, boost, glm, freetype }:
 
-let
-  name = "logstalgia-1.0.3";
-in
-stdenv.mkDerivation {
-  inherit name;
+stdenv.mkDerivation rec {
+  pname = "logstalgia";
+  version = "1.1.2";
 
   src = fetchurl {
-    url = "http://logstalgia.googlecode.com/files/logstalgia-1.0.3.tar.gz";
-    sha256 = "1sv1cizyw3y7g558hnvvcal8z889gbr82v4qj35hxdmrzygqlcyk";
+    url = "https://github.com/acaudwell/Logstalgia/releases/download/${pname}-${version}/${pname}-${version}.tar.gz";
+    sha256 = "1agwjlwzp1c86hqb1p7rmzqzhd3wpnyh8whsfq4sbx01wj0l0gzd";
   };
 
-  buildInputs = [glew SDL ftgl pkgconfig libpng libjpeg pcre SDL_image mesa];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ glew SDL2 ftgl libpng libjpeg pcre SDL2_image libGLU_combined boost
+                  glm freetype ];
 
-  meta = {
-    homepage = "http://code.google.com/p/logstalgia/";
-    description = "website traffic visualization tool";
-    license = stdenv.lib.licenses.gpl3Plus;
+  meta = with stdenv.lib; {
+    homepage = https://logstalgia.io/;
+    description = "Website traffic visualization tool";
+    license = licenses.gpl3Plus;
 
     longDescription = ''
       Logstalgia is a website traffic visualization that replays or
@@ -37,7 +38,7 @@ stdenv.mkDerivation {
       a Miscellaneous section.
     '';
 
-    platforms = stdenv.lib.platforms.gnu;
-    maintainers = [];
+    platforms = platforms.gnu ++ platforms.linux;
+    maintainers = with maintainers; [ pSub ];
   };
 }

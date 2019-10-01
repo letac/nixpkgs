@@ -1,25 +1,47 @@
-{ stdenv, fetchurl, qt4, which, dbus_libs, boost, libtorrentRasterbar
-, pkgconfig }:
+{ mkDerivation, lib, fetchFromGitHub, pkgconfig
+, boost, libtorrentRasterbar, qtbase, qttools, qtsvg
+, debugSupport ? false # Debugging
+, guiSupport ? true, dbus ? null # GUI (disable to run headless)
+, webuiSupport ? true # WebUI
+}:
 
-stdenv.mkDerivation rec {
-  name = "qbittorrent-3.1.3";
+assert guiSupport -> (dbus != null);
+with lib;
 
-  src = fetchurl {
-    url = "mirror://sourceforge/qbittorrent/${name}.tar.xz";
-    sha256 = "16m3l8qjcj63brzrdn82cbijvz8fcxfgpibi4g5g6sbissjkwsww";
+mkDerivation rec {
+  pname = "qbittorrent";
+  version = "4.1.7";
+
+  src = fetchFromGitHub {
+    owner = "qbittorrent";
+    repo = "qbittorrent";
+    rev = "release-${version}";
+    sha256 = "1z4k64h3ik1a7ir4v9g3ar1wq8zfh4r2pq43hr2wvlamm2111gdv";
   };
 
-  buildInputs = [ qt4 which dbus_libs boost libtorrentRasterbar
-    pkgconfig ];
+  # NOTE: 2018-05-31: CMake is working but it is not officially supported
+  nativeBuildInputs = [ pkgconfig ];
 
-  configureFlags = "--with-libboost-inc=${boost}/include "
-    + "--with-libboost-lib=${boost}/lib";
+  buildInputs = [ boost libtorrentRasterbar qtbase qttools qtsvg ]
+    ++ optional guiSupport dbus; # D(esktop)-Bus depends on GUI support
+
+  # Otherwise qm_gen.pri assumes lrelease-qt5, which does not exist.
+  QMAKE_LRELEASE = "lrelease";
+
+  configureFlags = [
+    "--with-boost-libdir=${boost.out}/lib"
+    "--with-boost=${boost.dev}" ]
+    ++ optionals (!guiSupport) [ "--disable-gui" "--enable-systemd" ] # Also place qbittorrent-nox systemd service files
+    ++ optional (!webuiSupport) "--disable-webui"
+    ++ optional debugSupport "--enable-debug";
 
   enableParallelBuilding = true;
 
   meta = {
-    description = "Free Software alternative to µtorrent";
-    homepage = http://www.qbittorrent.org/;
-    maintainers = with stdenv.lib.maintainers; [ viric ];
+    description = "Featureful free software BitTorrent client";
+    homepage    = https://www.qbittorrent.org/;
+    license     = licenses.gpl2;
+    platforms   = platforms.linux;
+    maintainers = with maintainers; [ Anton-Latukha ];
   };
 }

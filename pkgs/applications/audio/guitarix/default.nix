@@ -1,28 +1,44 @@
-{ stdenv, fetchurl, avahi, boost, fftw, gettext, glib, glibmm, gtk
-, gtkmm, intltool, jackaudio, ladspaH, librdf, libsndfile, lv2 
-, pkgconfig, python }:
+{ stdenv, fetchurl, gettext, intltool, pkgconfig, python2
+, avahi, bluez, boost, eigen, fftw, glib, glib-networking
+, glibmm, gsettings-desktop-schemas, gtkmm2, libjack2
+, ladspaH, libav, librdf, libsndfile, lilv, lv2, serd, sord, sratom
+, wrapGAppsHook, zita-convolver, zita-resampler, curl, wafHook
+, optimizationSupport ? false # Enable support for native CPU extensions
+}:
+
+let
+  inherit (stdenv.lib) optional;
+in
 
 stdenv.mkDerivation rec {
-  name = "guitarix-${version}";
-  version = "0.28.3";
+  pname = "guitarix";
+  version = "0.38.1";
 
   src = fetchurl {
-    url = "mirror://sourceforge/guitarix/guitarix2-${version}.tar.bz2";
-    sha256 = "0ks5avylyicqfj9l1wf4gj62i8m6is2jmp0h11h5l2wbg3xiwxjd";
+    url = "mirror://sourceforge/guitarix/guitarix2-${version}.tar.xz";
+    sha256 = "0bw7xnrx062nwb1bfj9x660h7069ncmz77szcs8icpqxrvhs7z80";
   };
 
+  nativeBuildInputs = [ gettext intltool wrapGAppsHook pkgconfig python2 wafHook ];
+
   buildInputs = [
-    avahi boost fftw gettext glib glibmm gtk gtkmm intltool jackaudio
-    ladspaH librdf libsndfile lv2 pkgconfig python
+    avahi bluez boost eigen fftw glib glibmm glib-networking.out
+    gsettings-desktop-schemas gtkmm2 libjack2 ladspaH libav librdf
+    libsndfile lilv lv2 serd sord sratom zita-convolver
+    zita-resampler curl
   ];
 
-  configurePhase = "python waf configure --prefix=$out";
+  wafConfigureFlags = [
+    "--shared-lib"
+    "--no-desktop-update"
+    "--enable-nls"
+    "--no-faust" # todo: find out why --faust doesn't work
+    "--install-roboto-font"
+    "--includeresampler"
+    "--convolver-ffmpeg"
+  ] ++ optional optimizationSupport "--optimization";
 
-  buildPhase = "python waf build";
-
-  installPhase = "python waf install";
-
-  meta = with stdenv.lib; { 
+  meta = with stdenv.lib; {
     description = "A virtual guitar amplifier for Linux running with JACK";
     longDescription = ''
         guitarix is a virtual guitar amplifier for Linux running with

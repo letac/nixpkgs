@@ -1,32 +1,47 @@
-{ stdenv, fetchurl, pkgconfig, udev }:
+{ stdenv, fetchurl, pkgconfig, udev, runtimeShellPackage, runtimeShell }:
 
 stdenv.mkDerivation rec {
-  name = "dhcpcd-6.4.2";
+  # when updating this to >=7, check, see previous reverts:
+  # nix-build -A nixos.tests.networking.scripted.macvlan.x86_64-linux nixos/release-combined.nix
+  pname = "dhcpcd";
+  version = "8.0.3";
 
   src = fetchurl {
-    url = "http://roy.marples.name/downloads/dhcpcd/${name}.tar.bz2";
-    sha256 = "1dr08aqvazg4ncq5p93v6givwh7naj75dn2npgplf3dl2fg9zfzf";
+    url = "mirror://roy/${pname}/${pname}-${version}.tar.xz";
+    sha256 = "07cg0sp8sk9b6ch2ajmvkbn6z08bgyx8xbd004s5mkasrlgrfx4n";
   };
 
-  patches = [ /* ./lxc_ro_promote_secondaries.patch */ ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [
+    udev
+    runtimeShellPackage # So patchShebangs finds a bash suitable for the installed scripts
+  ];
 
-  buildInputs = [ pkgconfig udev ];
+  prePatch = ''
+    substituteInPlace hooks/dhcpcd-run-hooks.in --replace /bin/sh ${runtimeShell}
+  '';
 
-  configureFlags = "--sysconfdir=/etc";
+  preConfigure = "patchShebangs ./configure";
 
-  makeFlags = "PREFIX=\${out}";
+  configureFlags = [
+    "--sysconfdir=/etc"
+    "--localstatedir=/var"
+  ];
+
+  makeFlags = [ "PREFIX=${placeholder "out"}" ];
 
   # Hack to make installation succeed.  dhcpcd will still use /var/db
   # at runtime.
-  installFlags = "DBDIR=\${TMPDIR}/db SYSCONFDIR=$(out)/etc";
+  installFlags = [ "DBDIR=$(TMPDIR)/db" "SYSCONFDIR=${placeholder "out"}/etc" ];
 
   # Check that the udev plugin got built.
-  postInstall = stdenv.lib.optional (udev != null) "[ -e $out/lib/dhcpcd/dev/udev.so ]";
+  postInstall = stdenv.lib.optional (udev != null) "[ -e ${placeholder "out"}/lib/dhcpcd/dev/udev.so ]";
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "A client for the Dynamic Host Configuration Protocol (DHCP)";
-    homepage = http://roy.marples.name/projects/dhcpcd;
-    platforms = stdenv.lib.platforms.linux;
-    maintainers = [ stdenv.lib.maintainers.eelco ];
+    homepage = https://roy.marples.name/projects/dhcpcd;
+    platforms = platforms.linux;
+    license = licenses.bsd2;
+    maintainers = with maintainers; [ eelco fpletz ];
   };
 }

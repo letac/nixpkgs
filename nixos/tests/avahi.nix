@@ -1,20 +1,26 @@
 # Test whether `avahi-daemon' and `libnss-mdns' work as expected.
-
-import ./make-test.nix {
+import ./make-test.nix ({ pkgs, ... } : {
   name = "avahi";
+  meta = with pkgs.stdenv.lib.maintainers; {
+    maintainers = [ eelco ];
+  };
 
-  nodes = {
-    one =
-      { config, pkgs, ... }: {
-        services.avahi.enable = true;
-        services.avahi.nssmdns = true;
+  nodes = let
+    cfg = { ... }: {
+      services.avahi = {
+        enable = true;
+        nssmdns = true;
+        publish.addresses = true;
+        publish.domain = true;
+        publish.enable = true;
+        publish.userServices = true;
+        publish.workstation = true;
+        extraServiceFiles.ssh = "${pkgs.avahi}/etc/avahi/services/ssh.service";
       };
-
-    two =
-      { config, pkgs, ... }: {
-        services.avahi.enable = true;
-        services.avahi.nssmdns = true;
-      };
+    };
+  in {
+    one = cfg;
+    two = cfg;
   };
 
   testScript =
@@ -51,5 +57,11 @@ import ./make-test.nix {
        $one->succeed("getent hosts two.local >&2");
        $two->succeed("getent hosts one.local >&2");
        $two->succeed("getent hosts two.local >&2");
+
+       # extra service definitions
+       $one->succeed("avahi-browse -r -t _ssh._tcp | tee out >&2");
+       $one->succeed("test `wc -l < out` -gt 0");
+       $two->succeed("avahi-browse -r -t _ssh._tcp | tee out >&2");
+       $two->succeed("test `wc -l < out` -gt 0");
     '';
-}
+})

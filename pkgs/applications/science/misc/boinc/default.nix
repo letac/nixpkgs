@@ -1,24 +1,30 @@
-{ fetchgit, stdenv, autoconf, automake, pkgconfig, m4, curl,
-mesa, libXmu, libXi, freeglut, libjpeg, libtool, wxGTK, xcbutil,
-sqlite, gtk, patchelf, libXScrnSaver, libnotify, libX11, libxcb }:
+{ fetchFromGitHub, stdenv, autoconf, automake, pkgconfig, m4, curl,
+libGLU_combined, libXmu, libXi, freeglut, libjpeg, libtool, wxGTK30, xcbutil,
+sqlite, gtk2, patchelf, libXScrnSaver, libnotify, libX11, libxcb }:
+
+let
+  majorVersion = "7.14";
+  minorVersion = "2";
+in
 
 stdenv.mkDerivation rec {
-  name = "boinc-7.2.42";
+  version = "${majorVersion}.${minorVersion}";
+  pname = "boinc";
 
-  src = fetchgit {
-    url = "git://boinc.berkeley.edu/boinc-v2.git";
-    rev = "dd0d630882547c123ca0f8fda7a62e058d60f6a9";
-    sha256 = "1zifpi3mjgaj68fba6kammp3x7z8n2x164zz6fj91xfiapnan56j";
+  src = fetchFromGitHub {
+    name = "${pname}-${version}-src";
+    owner = "BOINC";
+    repo = "boinc";
+    rev = "client_release/${majorVersion}/${version}";
+    sha256 = "0nicpkag18xq0libfqqvs0im22mijpsxzfk272iwdd9l0lmgfvyd";
   };
 
-  buildInputs = [ libtool automake autoconf m4 pkgconfig curl mesa libXmu libXi
-    freeglut libjpeg wxGTK sqlite gtk libXScrnSaver libnotify patchelf libX11 
-    libxcb xcbutil
-  ];
+  nativeBuildInputs = [ libtool automake autoconf m4 pkgconfig ];
 
-  postConfigure = ''
-    sed -i -e s,/etc,$out/etc, client/scripts/Makefile
-  '';
+  buildInputs = [
+    curl libGLU_combined libXmu libXi freeglut libjpeg wxGTK30 sqlite gtk2 libXScrnSaver
+    libnotify patchelf libX11 libxcb xcbutil
+  ];
 
   NIX_LDFLAGS = "-lX11";
 
@@ -29,15 +35,12 @@ stdenv.mkDerivation rec {
 
   enableParallelBuilding = true;
 
-  configureFlags = "--disable-server";
+  configureFlags = [ "--disable-server" ];
 
   meta = {
     description = "Free software for distributed and grid computing";
-
-    homepage = http://boinc.berkeley.edu/;
-
-    license = "LGPLv2+";
-
+    homepage = https://boinc.berkeley.edu/;
+    license = stdenv.lib.licenses.lgpl2Plus;
     platforms = stdenv.lib.platforms.linux;  # arbitrary choice
   };
 }

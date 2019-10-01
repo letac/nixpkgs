@@ -1,12 +1,19 @@
-{ stdenv, fetchurl, pkgconfig, intltool, glib, gstreamer, gst_plugins_base, gtk
-, libxfce4util, libxfce4ui, xfce4panel, xfconf, libunique?null }:
+{ stdenv, fetchurl, pkgconfig, intltool, makeWrapper
+, glib, gstreamer, gst-plugins-base, gtk
+, libxfce4util, libxfce4ui, xfce4-panel, xfconf, libunique ? null
+, pulseaudioSupport ? false, gst-plugins-good
+}:
 
 let
   # The usual Gstreamer plugins package has a zillion dependencies
   # that we don't need for a simple mixer, so build a minimal package.
-  gst_plugins_minimal = gst_plugins_base.override {
+  gst_plugins_minimal = gst-plugins-base.override {
     minimalDeps = true;
   };
+  gst_plugins_pulse = gst-plugins-good.override {
+    minimalDeps = true;
+  };
+  gst_plugins = [ gst_plugins_minimal ] ++ stdenv.lib.optional pulseaudioSupport gst_plugins_pulse;
 
 in
 
@@ -22,20 +29,22 @@ stdenv.mkDerivation rec {
   name = "${p_name}-${ver_maj}.${ver_min}";
 
   buildInputs =
-    [ pkgconfig intltool glib gstreamer gst_plugins_minimal gtk
-      libxfce4util libxfce4ui xfce4panel xfconf libunique
-    ];
+    [ pkgconfig intltool glib gstreamer gtk
+      libxfce4util libxfce4ui xfce4-panel xfconf libunique makeWrapper
+    ] ++ gst_plugins;
 
   postInstall =
     ''
-      mkdir -p $out/nix-support
-      echo ${gst_plugins_minimal} > $out/nix-support/propagated-user-env-packages
+      wrapProgram "$out/bin/xfce4-mixer" \
+        --prefix GST_PLUGIN_SYSTEM_PATH : "$GST_PLUGIN_SYSTEM_PATH"
     '';
 
+  passthru = { inherit gst_plugins; };
+
   meta = {
-    homepage = http://www.xfce.org/projects/xfce4-mixer; # referenced but inactive
+    homepage = https://www.xfce.org/projects/xfce4-mixer; # referenced but inactive
     description = "A volume control application for the Xfce desktop environment";
-    license = "GPLv2+";
+    license = stdenv.lib.licenses.gpl2Plus;
     platforms = stdenv.lib.platforms.linux;
     maintainers = [ stdenv.lib.maintainers.eelco ];
   };

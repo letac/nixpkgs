@@ -1,33 +1,42 @@
-{ stdenv, fetchgit, php, flex, makeWrapper }:
+{ stdenv, fetchFromGitHub, php, flex, makeWrapper }:
 
 let
-  libphutil = fetchgit {
-    url    = "git://github.com/facebook/libphutil.git";
-    rev    = "d8c026530d7f442eb0f93233b536cfb06aec911d";
-    sha256 = "6cbeb5b7640371f95ef017f3382f33a985a5c417f69e837fbb3b59c0332b5ecf";
+  libphutil = fetchFromGitHub {
+    owner = "phacility";
+    repo = "libphutil";
+    rev = "3215e4e291ed4468faeed4542d47a571b5bc559a";
+    sha256 = "0bbinaxny0j4iniz2grf0s9cysbl3x24yc32f3jra9mwsgh2v2zj";
   };
-  arcanist = fetchgit {
-    url    = "git://github.com/facebook/arcanist.git";
-    rev    = "a9535446579af33dfa50f60dcc79c9edf633eebd";
-    sha256 = "8468f3beecdce2f62dc010ddade8ffbf0a8802f23ee88b91e09c09f173e692f6";
+  arcanist = fetchFromGitHub {
+    owner = "phacility";
+    repo = "arcanist";
+    rev = "2650e8627a20e1bfe334a4a2b787f44ef5d6ebc5";
+    sha256 = "0x0xxiar202ypbgxh19swzjil546bbp8li4k5yrpvab55y8ymkd4";
   };
 in
-stdenv.mkDerivation rec {
-  name    = "arcanist-${version}";
-  version = "20140717";
+stdenv.mkDerivation {
+  pname = "arcanist";
+  version = "20180916";
 
   src = [ arcanist libphutil ];
   buildInputs = [ php makeWrapper flex ];
 
-  unpackPhase = "true";
-  buildPhase = ''
-    ORIG=`pwd`
-    cp -R ${libphutil} libphutil
-    cp -R ${arcanist} arcanist
+  unpackPhase = ''
+    cp -aR ${libphutil} libphutil
+    cp -aR ${arcanist} arcanist
     chmod +w -R libphutil arcanist
-    cd libphutil/support/xhpast
-    make clean all install
-    cd $ORIG
+  '';
+
+  postPatch = stdenv.lib.optionalString stdenv.isAarch64 ''
+    substituteInPlace libphutil/support/xhpast/Makefile \
+      --replace "-minline-all-stringops" ""
+  '';
+
+  buildPhase = ''
+    (
+      cd libphutil/support/xhpast
+      make clean all install
+    )
   '';
   installPhase = ''
     mkdir -p $out/bin $out/libexec

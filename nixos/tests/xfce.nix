@@ -1,8 +1,11 @@
-import ./make-test.nix {
+import ./make-test.nix ({ pkgs, ...} : {
   name = "xfce";
+  meta = with pkgs.stdenv.lib.maintainers; {
+    maintainers = [ eelco shlevy ];
+  };
 
   machine =
-    { config, pkgs, ... }:
+    { pkgs, ... }:
 
     { imports = [ ./common/user-account.nix ];
 
@@ -12,11 +15,19 @@ import ./make-test.nix {
       services.xserver.displayManager.auto.user = "alice";
 
       services.xserver.desktopManager.xfce.enable = true;
+
+      environment.systemPackages = [ pkgs.xorg.xmessage ];
+
+      hardware.pulseaudio.enable = true; # needed for the factl test, /dev/snd/* exists without them but udev doesn't care then
+
+      virtualisation.memorySize = 1024;
     };
 
   testScript =
     ''
       $machine->waitForX;
+      $machine->waitForFile("/home/alice/.Xauthority");
+      $machine->succeed("xauth merge ~alice/.Xauthority");
       $machine->waitForWindow(qr/xfce4-panel/);
       $machine->sleep(10);
 
@@ -27,6 +38,9 @@ import ./make-test.nix {
       $machine->waitForWindow(qr/Terminal/);
       $machine->sleep(10);
       $machine->screenshot("screen");
-    '';
 
-}
+      # Ensure that the X server does proper access control.
+      $machine->mustFail("su - bob -c 'DISPLAY=:0.0 xmessage Foo'");
+      $machine->mustFail("su - bob -c 'DISPLAY=:0 xmessage Foo'");
+    '';
+})

@@ -1,21 +1,37 @@
-{ stdenv, fetchurl, getopt, lua, boost }:
-        
-stdenv.mkDerivation rec {
-  name = "highlight-3.9";
+{ stdenv, fetchFromGitLab, getopt, lua, boost, pkgconfig, gcc }:
 
-  src = fetchurl {
-    url = "http://www.andre-simon.de/zip/${name}.tar.bz2";
-    sha256 = "1vysj34zz8gk5yhlzm7g6lbphb8y6zfbd9smfgsgwkyawfargrja";
+with stdenv.lib;
+
+stdenv.mkDerivation rec {
+  pname = "highlight";
+  version = "3.53";
+
+  src = fetchFromGitLab {
+    owner = "saalen";
+    repo = "highlight";
+    rev = "v${version}";
+    sha256 = "11szws4q6qyffq2fsvh1vksh1d0kcwg6smyyba9yr61hzx6zmzgr";
   };
+
+  enableParallelBuilding = true;
+
+  nativeBuildInputs = [ pkgconfig ] ++ optional stdenv.isDarwin  gcc ;
 
   buildInputs = [ getopt lua boost ];
 
-  makeFlags = [
-    "PREFIX=$(out)"
-    "conf_dir=$(out)/etc/highlight/"
-  ];
+  prePatch = stdenv.lib.optionalString stdenv.cc.isClang ''
+    substituteInPlace src/makefile \
+        --replace 'CXX=g++' 'CXX=clang++'
+  '';
 
-  meta = {
+  preConfigure = ''
+    makeFlags="PREFIX=$out conf_dir=$out/etc/highlight/ CXX=$CXX AR=$AR"
+  '';
+
+  meta = with stdenv.lib; {
     description = "Source code highlighting tool";
+    homepage = "http://www.andre-simon.de/doku/highlight/en/highlight.php";
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ ndowens willibutz ];
   };
 }

@@ -4,7 +4,7 @@ stdenv.mkDerivation rec {
   name = "junixsocket-1.3";
 
   src = fetchurl {
-    url = "http://junixsocket.googlecode.com/files/${name}-src.tar.bz2";
+    url = "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/junixsocket/${name}-src.tar.bz2";
     sha256 = "0c6p8vmiv5nk8i6g1hgivnl3mpb2k3lhjjz0ss9dlirisfrxf1ym";
   };
 
@@ -14,9 +14,6 @@ stdenv.mkDerivation rec {
 
   preConfigure =
     ''
-      substituteInPlace build.xml \
-        --replace /usr/bin/ "" \
-        --replace macosx darwin
       substituteInPlace src/main/org/newsclub/net/unix/NativeUnixSocketConfig.java \
         --replace /opt/newsclub/lib-native $out/lib
     '';
@@ -25,7 +22,7 @@ stdenv.mkDerivation rec {
 
   ANT_ARGS =
     # Note that our OpenJDK on Darwin is currently 32-bit, so we have to build a 32-bit dylib.
-    (if stdenv.is64bit && !stdenv.isDarwin then [ "-Dskip32=true" ] else [ "-Dskip64=true" ])
+    (if stdenv.is64bit then [ "-Dskip32=true" ] else [ "-Dskip64=true" ])
     ++ [ "-Dgcc=cc" "-Dant.build.javac.source=1.6" ]
     ++ stdenv.lib.optional stdenv.isDarwin "-DisMac=true";
 
@@ -38,7 +35,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "A Java/JNI library for using Unix Domain Sockets from Java";
-    homepage = https://code.google.com/p/junixsocket/;
+    homepage = https://github.com/kohlschutter/junixsocket;
     license = stdenv.lib.licenses.asl20;
     platforms = stdenv.lib.platforms.linux ++ stdenv.lib.platforms.darwin;
   };

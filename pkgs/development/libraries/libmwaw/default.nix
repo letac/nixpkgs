@@ -3,19 +3,21 @@ let
   s = # Generated upstream information
   rec {
     baseName="libmwaw";
-    version="0.3.1";
+    version="0.3.15";
     name="${baseName}-${version}";
-    hash="0fa6nf4pxl853xnh2kdjw1nk3w6i39diixiampml7g9qygbd0vqb";
-    url="mirror://sourceforge/project/libmwaw/libmwaw/libmwaw-0.3.1/libmwaw-0.3.1.tar.xz";
-    sha256="0fa6nf4pxl853xnh2kdjw1nk3w6i39diixiampml7g9qygbd0vqb";
+    hash="1cdhm9yhanyv3w4vr73zhgyynmkhhkp3dyld7m11jd2yy04vnh04";
+    url="mirror://sourceforge/libmwaw/libmwaw/libmwaw-0.3.15/libmwaw-0.3.15.tar.xz";
+    sha256="1cdhm9yhanyv3w4vr73zhgyynmkhhkp3dyld7m11jd2yy04vnh04";
   };
+
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    boost pkgconfig cppunit zlib libwpg libwpd librevenge
+    boost cppunit zlib libwpg libwpd librevenge
   ];
 in
 stdenv.mkDerivation {
   inherit (s) name version;
-  inherit buildInputs;
+  inherit nativeBuildInputs buildInputs;
   src = fetchurl {
     inherit (s) url sha256;
   };
@@ -24,6 +26,6 @@ stdenv.mkDerivation {
     description = ''Import library for some old mac text documents'';
     license = stdenv.lib.licenses.mpl20 ;
     maintainers = [stdenv.lib.maintainers.raskin];
-    platforms = stdenv.lib.platforms.linux;
+    platforms = stdenv.lib.platforms.unix;
   };
 }

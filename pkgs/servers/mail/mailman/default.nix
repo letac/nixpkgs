@@ -1,26 +1,33 @@
-{ stdenv, fetchurl, python }:
+{ stdenv, fetchurl, python2 }:
 
 stdenv.mkDerivation rec {
-  name = "mailman-2.1.17";
+  pname = "mailman";
+  version = "2.1.29";
 
   src = fetchurl {
-    url = "mirror://gnu/mailman/${name}.tgz";
-    sha256 = "1rws4ghpq78ldp1si3z4pmiv1k4l8g6i6hjb2y4cwsjlxssahc64";
+    url = "mirror://gnu/mailman/${pname}-${version}.tgz";
+    sha256 = "0b0dpwf6ap260791c7lg2vpw30llf19hymbf2hja3s016rqp5243";
   };
 
-  buildInputs = [ python ];
+  buildInputs = [ python2 python2.pkgs.dnspython ];
 
   patches = [ ./fix-var-prefix.patch ];
 
-  configureFlags = "--without-permcheck --with-cgi-ext=.cgi --with-var-prefix=/var/lib/mailman";
+  configureFlags = [
+    "--without-permcheck"
+    "--with-cgi-ext=.cgi"
+    "--with-var-prefix=/var/lib/mailman"
+  ];
 
-  installTargets = "doinstall";         # Leave out the 'update' target that's implied by 'install'.
+  installTargets = "doinstall"; # Leave out the 'update' target that's implied by 'install'.
+
+  makeFlags = [ "DIRSETGID=:" ];
 
   meta = {
-    homepage = "http://www.gnu.org/software/mailman/";
+    homepage = https://www.gnu.org/software/mailman/;
     description = "Free software for managing electronic mail discussion and e-newsletter lists";
     license = stdenv.lib.licenses.gpl2Plus;
     platforms = stdenv.lib.platforms.linux;
-    maintainers = [ stdenv.lib.maintainers.simons ];
+    maintainers = [ stdenv.lib.maintainers.peti ];
   };
 }

@@ -8,7 +8,7 @@ stdenv.mkDerivation {
   };
 
   src = fetchurl {
-    url = http://ftp.penguin.cz/pub/users/utx/amr/amrnb-11.0.0.0.tar.bz2;
+    url = http://www.penguin.cz/~utx/ftp/amr/amrnb-11.0.0.0.tar.bz2;
     sha256 = "1qgiw02n2a6r32pimnd97v2jkvnw449xrqmaxiivjy2jcr5h141q";
   };
 
@@ -26,6 +26,6 @@ stdenv.mkDerivation {
     # The wrapper code is free, but not the libraries from 3gpp.
     # It's a source code reference implementation with patents and licenses on
     # some countries, not redistributable.
-    license = "unfree";
+    license = stdenv.lib.licenses.unfree;
   };
 }

@@ -1,4 +1,4 @@
-{ fetchurl, stdenv, gss, libidn }:
+{ fetchurl, stdenv, libidn, kerberos }:
 
 stdenv.mkDerivation rec {
   name = "gsasl-1.8.0";
@@ -8,12 +8,11 @@ stdenv.mkDerivation rec {
     sha256 = "1rci64cxvcfr8xcjpqc4inpfq7aw4snnsbf5xz7d30nhvv8n40ii";
   };
 
-  buildInputs = [ libidn ]
-    ++ stdenv.lib.optional (!stdenv.isDarwin) gss;
+  buildInputs = [ libidn kerberos ];
 
-  configureFlags = stdenv.lib.optionalString stdenv.isDarwin "--with-gssapi-impl=mit";
+  configureFlags = [ "--with-gssapi-impl=mit" ];
 
-  doCheck = true;
+  doCheck = !stdenv.hostPlatform.isDarwin;
 
   meta = {
     description = "GNU SASL, Simple Authentication and Security Layer library";
@@ -25,10 +24,10 @@ stdenv.mkDerivation rec {
          (e.g. IMAP, SMTP, etc.) to authenticate peers. 
        '';
 
-    homepage = http://www.gnu.org/software/gsasl/;
-    license = "GPLv3+";
+    homepage = https://www.gnu.org/software/gsasl/;
+    license = stdenv.lib.licenses.gpl3Plus;
 
-    maintainers = with stdenv.lib.maintainers; [ ];
+    maintainers = with stdenv.lib.maintainers; [ shlevy ];
     platforms = stdenv.lib.platforms.all;
   };
 }

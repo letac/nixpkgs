@@ -1,20 +1,21 @@
 { stdenv, fetchurl, pkgconfig, glib, python3, libsigrok, check }:
 
 stdenv.mkDerivation rec {
-  name = "libsigrokdecode-0.3.0";
+  name = "libsigrokdecode-0.5.2";
 
   src = fetchurl {
-    url = "http://sigrok.org/download/source/libsigrokdecode/${name}.tar.gz";
-    sha256 = "13s7ss52dqj7fccjgrkx10zkj41ygxn8ml1l0bs1vgczz4fvnkpf";
+    url = "https://sigrok.org/download/source/libsigrokdecode/${name}.tar.gz";
+    sha256 = "1w434nl1syjkvwl08lji3r9sr60lbxp1nqys8hqwzv2lgiwrx3g0";
   };
 
-  buildInputs = [ pkgconfig glib python3 libsigrok check ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ glib python3 libsigrok check ];
 
   meta = with stdenv.lib; {
     description = "Protocol decoding library for the sigrok signal analysis software suite";
-    homepage = http://sigrok.org/;
+    homepage = https://sigrok.org/;
     license = licenses.gpl3Plus;
-    platforms = platforms.linux;
+    platforms = platforms.linux ++ platforms.darwin;
     maintainers = [ maintainers.bjornfor ];
   };
 }

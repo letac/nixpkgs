@@ -1,22 +1,28 @@
-{ stdenv, fetchurl }:
+{ stdenv, fetchFromGitHub, compiler ? if stdenv.cc.isClang then "clang" else null, stdver ? null }:
 
-stdenv.mkDerivation {
-  name = "tbb-4.2-u5";
+with stdenv.lib; stdenv.mkDerivation rec {
+  pname = "tbb";
+  version = "2019_U8";
 
-  src = fetchurl {
-    url = "https://www.threadingbuildingblocks.org/sites/default/files/software_releases/source/tbb42_20140601oss_src.tgz";
-    sha256 = "1zjh81hvfxvk1v1li27w1nm3bp6kqv913lxfb2pqa134dibw2pp7";
+  src = fetchFromGitHub {
+    owner = "01org";
+    repo = "tbb";
+    rev = version;
+    sha256 = "0z0kh1a5g28gckcxlv3x7qqskh5fsl8knf2ypbbvk7z9ln9k3wfq";
   };
 
-  checkTarget = "test";
-  doCheck = false;
+  makeFlags = concatStringsSep " " (
+    optional (compiler != null) "compiler=${compiler}" ++
+    optional (stdver != null) "stdver=${stdver}"
+  );
+
+  patches = stdenv.lib.optional stdenv.hostPlatform.isMusl ./glibc-struct-mallinfo.patch;
 
   installPhase = ''
-    mkdir -p $out/{lib,share/doc}
-    cp "build/"*release*"/"*so* $out/lib/
+    mkdir -p $out/lib
+    cp "build/"*release*"/"*${stdenv.hostPlatform.extensions.sharedLibrary}* $out/lib/
     mv include $out/
     rm $out/include/index.html
-    mv doc/html $out/share/doc/tbb
   '';
 
   enableParallelBuilding = true;
@@ -24,7 +30,7 @@ stdenv.mkDerivation {
   meta = {
     description = "Intel Thread Building Blocks C++ Library";
     homepage = "http://threadingbuildingblocks.org/";
-    license = "LGPLv3+";
+    license = licenses.asl20;
     longDescription = ''
       Intel Threading Building Blocks offers a rich and complete approach to
       expressing parallelism in a C++ program. It is a library that helps you
@@ -33,7 +39,7 @@ stdenv.mkDerivation {
       represents a higher-level, task-based parallelism that abstracts platform
       details and threading mechanisms for scalability and performance.
     '';
-    platforms = stdenv.lib.platforms.linux;
-    maintainers = with stdenv.lib.maintainers; [ simons thoughtpolice ];
+    platforms = with platforms; linux ++ darwin;
+    maintainers = with maintainers; [ thoughtpolice dizfer ];
   };
 }

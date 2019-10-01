@@ -1,30 +1,32 @@
-{ stdenv, fetchurl, ncurses, groff }:
+{ stdenv, fetchurl, ncurses }:
 
 stdenv.mkDerivation rec {
-  name = "libedit-20130712-3.1";
+  pname = "libedit";
+  version = "20190324-3.1";
 
   src = fetchurl {
-    url = "http://www.thrysoee.dk/editline/${name}.tar.gz";
-    sha256 = "0dwav34041sariyl00nr106xmn123bnxir4qpn5y47vgssfim6sx";
+    url = "https://thrysoee.dk/editline/${pname}-${version}.tar.gz";
+    sha256 = "1bhvp8xkkgrg89k4ci1k8vjl3nhb6szd4ghy9lp4jrfgq58hz3xc";
   };
 
+  outputs = [ "out" "dev" ];
+
   # Have `configure' avoid `/usr/bin/nroff' in non-chroot builds.
-  NROFF = "${groff}/bin/nroff";
+  # NROFF = "${groff}/bin/nroff";
 
-  postInstall = ''
-    sed -i s/-lncurses/-lncursesw/g $out/lib/pkgconfig/libedit.pc
-  '';
-
-  # taken from gentoo http://sources.gentoo.org/cgi-bin/viewvc.cgi/gentoo-x86/dev-libs/libedit/files/
-  patches = [ ./freebsd.patch ./freebsd_weak_ref.patch ];
-
-  configureFlags = "--enable-widec";
+  patches = [ ./01-cygwin.patch ];
 
   propagatedBuildInputs = [ ncurses ];
 
+  postInstall = ''
+    find $out/lib -type f | grep '\.\(la\|pc\)''$' | xargs sed -i \
+      -e 's,-lncurses[a-z]*,-L${ncurses.out}/lib -lncursesw,g'
+  '';
+
   meta = with stdenv.lib; {
-    homepage = "http://www.thrysoee.dk/editline/";
+    homepage = http://www.thrysoee.dk/editline/;
     description = "A port of the NetBSD Editline library (libedit)";
-    license = licenses.bsd3; 
+    license = licenses.bsd3;
+    platforms = platforms.all;
   };
 }

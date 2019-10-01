@@ -1,34 +1,44 @@
-{ stdenv, fetchurl, boost, cmake, ilmbase, libjpeg, libpng, libtiff
+{ stdenv, fetchFromGitHub, boost, cmake, ilmbase, libjpeg, libpng, libtiff
 , opencolorio, openexr, unzip
 }:
 
 stdenv.mkDerivation rec {
-  name = "oiio-${version}";
-  version = "1.3.12";
+  pname = "openimageio";
+  version = "1.8.16";
 
-  src = fetchurl {
-    url = "https://github.com/OpenImageIO/oiio/archive/Release-${version}.zip";
-    sha256 = "114jx4pcqhzdchzpxbwrfzqmnxr2bm8cw13g4akz1hg8pvr1dhsb";
+  src = fetchFromGitHub {
+    owner = "OpenImageIO";
+    repo = "oiio";
+    rev = "Release-${version}";
+    sha256 = "0isx137c6anvs1xfxi0z35v1cw855xvnq2ca0pakqqpdh0yivrps";
   };
 
+  outputs = [ "bin" "out" "dev" "doc" ];
+
+  nativeBuildInputs = [ cmake unzip ];
   buildInputs = [
-    boost cmake ilmbase libjpeg libpng libtiff opencolorio openexr unzip
+    boost ilmbase libjpeg libpng
+    libtiff opencolorio openexr
   ];
 
-  configurePhase = "";
+  cmakeFlags = [
+    "-DUSE_PYTHON=OFF"
+  ];
 
-  buildPhase = ''
-    make ILMBASE_HOME=${ilmbase} OPENEXR_HOME=${openexr} USE_PYTHON=0 \
-      INSTALLDIR=$out dist_dir=
-  '';
-
-  installPhase = ":";
+  makeFlags = [
+    "ILMBASE_HOME=${ilmbase.dev}"
+    "OPENEXR_HOME=${openexr.dev}"
+    "USE_PYTHON=0"
+    "INSTALLDIR=${placeholder "out"}"
+    "dist_dir="
+  ];
 
   meta = with stdenv.lib; {
     homepage = http://www.openimageio.org;
     description = "A library and tools for reading and writing images";
     license = licenses.bsd3;
     maintainers = [ maintainers.goibhniu ];
-    platforms = platforms.linux;
+    platforms = platforms.unix;
+    badPlatforms = [ "x86_64-darwin" ];
   };
 }

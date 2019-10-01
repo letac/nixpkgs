@@ -1,52 +1,72 @@
-{ stdenv, fetchurl, perlSupport, libX11, libXt, libXft, ncurses, perl,
-  fontconfig, freetype, pkgconfig, libXrender, gdkPixbufSupport, gdk_pixbuf,
-  unicode3Support }:
+{ stdenv, fetchurl, makeDesktopItem, perlSupport ? true, libX11, libXt, libXft,
+  ncurses, perl, fontconfig, freetype, pkgconfig, libXrender,
+  gdkPixbufSupport ? true, gdk-pixbuf, unicode3Support ? true }:
 
 let
-  name = "rxvt-unicode";
-  version = "9.20";
-  n = "${name}-${version}";
+  pname = "rxvt-unicode";
+  version = "9.22";
+  description = "A clone of the well-known terminal emulator rxvt";
+
+  desktopItem = makeDesktopItem {
+    name = pname;
+    exec = "urxvt";
+    icon = "utilities-terminal";
+    comment = description;
+    desktopName = "URxvt";
+    genericName = pname;
+    categories = "System;TerminalEmulator;";
+  };
 in
 
-stdenv.mkDerivation (rec {
+stdenv.mkDerivation ({
 
-  name = "${n}${if perlSupport then "-with-perl" else ""}${if unicode3Support then "-with-unicode3" else ""}";
+  name = "${pname}${if perlSupport then "-with-perl" else ""}${if unicode3Support then "-with-unicode3" else ""}-${version}";
 
   src = fetchurl {
     url = "http://dist.schmorp.de/rxvt-unicode/Attic/rxvt-unicode-${version}.tar.bz2";
-    sha256 = "e73e13fe64b59fd3c8e6e20c00f149d388741f141b8155e4700d3ed40aa94b4e";
+    sha256 = "1pddjn5ynblwfrdmskylrsxb9vfnk3w4jdnq2l8xn2pspkljhip9";
   };
 
   buildInputs =
     [ libX11 libXt libXft ncurses /* required to build the terminfo file */
       fontconfig freetype pkgconfig libXrender ]
     ++ stdenv.lib.optional perlSupport perl
-    ++ stdenv.lib.optional gdkPixbufSupport gdk_pixbuf;
+    ++ stdenv.lib.optional gdkPixbufSupport gdk-pixbuf;
 
   outputs = [ "out" "terminfo" ];
 
   patches = [
     ./rxvt-unicode-9.06-font-width.patch
     ./rxvt-unicode-256-color-resources.patch
-  ];
+  ]
+  ++ stdenv.lib.optional stdenv.isDarwin ./rxvt-unicode-makefile-phony.patch;
 
   preConfigure =
     ''
       mkdir -p $terminfo/share/terminfo
       configureFlags="--with-terminfo=$terminfo/share/terminfo --enable-256-color ${if perlSupport then "--enable-perl" else "--disable-perl"} ${if unicode3Support then "--enable-unicode3" else "--disable-unicode3"}";
       export TERMINFO=$terminfo/share/terminfo # without this the terminfo won't be compiled by tic, see man tic
-      NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -I${freetype}/include/freetype2"
-      NIX_LDFLAGS="$NIX_LDFLAGS -lfontconfig -lXrender "
+      NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -I${freetype.dev}/include/freetype2"
+      NIX_LDFLAGS="$NIX_LDFLAGS -lfontconfig -lXrender -lpthread "
     ''
     # make urxvt find its perl file lib/perl5/site_perl is added to PERL5LIB automatically
     + stdenv.lib.optionalString perlSupport ''
-      mkdir -p $out/lib/perl5
-      ln -s $out/{lib/urxvt,lib/perl5/site_perl}
+      mkdir -p $out/$(dirname ${perl.libPrefix})
+      ln -s $out/lib/urxvt $out/${perl.libPrefix}
     '';
 
-  meta = {
-    description = "A clone of the well-known terminal emulator rxvt";
-    homepage = "http://software.schmorp.de/pkg/rxvt-unicode.html";
-    maintainers = stdenv.lib.maintainers.mornfall;
+  postInstall = ''
+    mkdir -p $out/nix-support
+    echo "$terminfo" >> $out/nix-support/propagated-user-env-packages
+    cp -r ${desktopItem}/share/applications/ $out/share/
+  '';
+
+  meta = with stdenv.lib; {
+    inherit description;
+    homepage = http://software.schmorp.de/pkg/rxvt-unicode.html;
+    downloadPage = "http://dist.schmorp.de/rxvt-unicode/Attic/";
+    maintainers = with maintainers; [ rnhmjoj ];
+    platforms = platforms.unix;
+    license = licenses.gpl3;
   };
 })

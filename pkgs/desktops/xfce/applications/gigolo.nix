@@ -11,10 +11,11 @@ stdenv.mkDerivation rec {
   };
   name = "${p_name}-${ver_maj}.${ver_min}";
 
-  buildInputs = [ python gettext intltool gtk pkgconfig gvfs];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ python gettext intltool gtk gvfs];
 
   meta = {
-    homepage = "http://goodies.xfce.org/projects/applications/${p_name}";
+    homepage = "https://goodies.xfce.org/projects/applications/${p_name}";
     description = "A frontend to easily manage connections to remote filesystems";
     platforms = stdenv.lib.platforms.linux;
   };

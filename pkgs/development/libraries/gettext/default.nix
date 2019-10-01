@@ -1,48 +1,82 @@
-{ stdenv, fetchurl, libiconv, xz }:
+{ stdenv, lib, fetchurl, libiconv, xz, bison, automake115x, autoconf }:
 
-stdenv.mkDerivation (rec {
-  name = "gettext-0.18.2";
+let allowBisonDependency = !stdenv.isDarwin; in
+stdenv.mkDerivation rec {
+  pname = "gettext";
+  version = "0.19.8.1";
 
   src = fetchurl {
-    url = "mirror://gnu/gettext/${name}.tar.gz";
-    sha256 = "516a6370b3b3f46e2fc5a5e222ff5ecd76f3089bc956a7587a6e4f89de17714c";
+    url = "mirror://gnu/gettext/${pname}-${version}.tar.gz";
+    sha256 = "0hsw28f9q9xaggjlsdp2qmbp2rbd1mp0njzan2ld9kiqwkq2m57z";
   };
+  patches = [
+    ./absolute-paths.diff
+    (fetchurl {
+      name = "CVE-2018-18751.patch";
+      url = "https://git.savannah.gnu.org/gitweb/?p=gettext.git;a=patch;h=dce3a16e5e9368245735e29bf498dcd5e3e474a4";
+      sha256 = "1lpjwwcjr1sb879faj0xyzw02kma0ivab6xwn3qciy13qy6fq5xn";
+    })
+  ] ++ lib.optionals (!allowBisonDependency) [
+    # Only necessary for CVE-2018-18751.patch:
+    ./CVE-2018-18751-bison.patch
+  ];
+
+  outputs = [ "out" "man" "doc" "info" ];
+
+  hardeningDisable = [ "format" ];
 
   LDFLAGS = if stdenv.isSunOS then "-lm -lmd -lmp -luutil -lnvpair -lnsl -lidmap -lavl -lsec" else "";
 
-  configureFlags = [ "--disable-csharp" "--with-xz" ]
-     ++ (stdenv.lib.optionals stdenv.isCygwin
-          [ # We have a static libiconv, so we can only build the static lib.
-            "--disable-shared" "--enable-static"
+  configureFlags = [
+     "--disable-csharp" "--with-xz"
+     # avoid retaining reference to CF during stdenv bootstrap
+  ] ++ lib.optionals stdenv.isDarwin [
+    "gt_cv_func_CFPreferencesCopyAppValue=no"
+    "gt_cv_func_CFLocaleCopyCurrent=no"
+  ] ++ stdenv.lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+    # On cross building, gettext supposes that the wchar.h from libc
+    # does not fulfill gettext needs, so it tries to work with its
+    # own wchar.h file, which does not cope well with the system's
+    # wchar.h and stddef.h (gcc-4.3 - glibc-2.9)
+    "gl_cv_func_wcwidth_works=yes"
+  ];
 
-            # Share the cache among the various `configure' runs.
-            "--config-cache"
-          ]);
-
-  # On cross building, gettext supposes that the wchar.h from libc
-  # does not fulfill gettext needs, so it tries to work with its
-  # own wchar.h file, which does not cope well with the system's
-  # wchar.h and stddef.h (gcc-4.3 - glibc-2.9)
-  preConfigure = ''
-    if test -n "$crossConfig"; then
-      echo gl_cv_func_wcwidth_works=yes > cachefile
-      configureFlags="$configureFlags --cache-file=`pwd`/cachefile"
-    fi
+  postPatch = ''
+   substituteAllInPlace gettext-runtime/src/gettext.sh.in
+   substituteInPlace gettext-tools/projects/KDE/trigger --replace "/bin/pwd" pwd
+   substituteInPlace gettext-tools/projects/GNOME/trigger --replace "/bin/pwd" pwd
+   substituteInPlace gettext-tools/src/project-id --replace "/bin/pwd" pwd
+  '' + lib.optionalString stdenv.hostPlatform.isCygwin ''
+    sed -i -e "s/\(cldr_plurals_LDADD = \)/\\1..\/gnulib-lib\/libxml_rpl.la /" gettext-tools/src/Makefile.in
+    sed -i -e "s/\(libgettextsrc_la_LDFLAGS = \)/\\1..\/gnulib-lib\/libxml_rpl.la /" gettext-tools/src/Makefile.in
   '';
 
-  buildInputs = [ xz ] ++ stdenv.lib.optional (!stdenv.isLinux) libiconv;
+  nativeBuildInputs = [
+    xz
+    xz.bin
+  ]
+  # Only necessary for CVE-2018-18751.patch (unless CVE-2018-18751-bison.patch
+  # is also applied):
+  ++ lib.optional allowBisonDependency bison
+  ++ [
+    # Only necessary for CVE-2018-18751.patch:
+    automake115x
+    autoconf
+  ];
+  # HACK, see #10874 (and 14664)
+  buildInputs = stdenv.lib.optional (!stdenv.isLinux && !stdenv.hostPlatform.isCygwin) libiconv;
+
+  setupHooks = [
+    ../../../build-support/setup-hooks/role.bash
+    ./gettext-setup-hook.sh
+  ];
+  gettextNeedsLdflags = stdenv.hostPlatform.libc != "glibc" && !stdenv.hostPlatform.isMusl;
 
   enableParallelBuilding = true;
+  enableParallelChecking = false; # fails sometimes
 
-  crossAttrs = {
-    buildInputs = stdenv.lib.optional (stdenv.gccCross.libc ? libiconv)
-      stdenv.gccCross.libc.libiconv.crossDrv;
-    # Gettext fails to guess the cross compiler
-    configureFlags = "CXX=${stdenv.cross.config}-g++";
-  };
-
-  meta = {
-    description = "GNU gettext, a well integrated set of translation tools and documentation";
+  meta = with lib; {
+    description = "Well integrated set of translation tools and documentation";
 
     longDescription = ''
       Usually, programs are written and documented in English, and use
@@ -63,24 +97,14 @@ stdenv.mkDerivation (rec {
       GNU packages produce multi-lingual messages.
     '';
 
-    homepage = http://www.gnu.org/software/gettext/;
+    homepage = https://www.gnu.org/software/gettext/;
 
-    maintainers = [ stdenv.lib.maintainers.ludo ];
-    platforms = stdenv.lib.platforms.all;
+    maintainers = with maintainers; [ zimbatm vrthra ];
+    license = licenses.gpl2Plus;
+    platforms = platforms.all;
   };
 }
 
 // stdenv.lib.optionalAttrs stdenv.isDarwin {
   makeFlags = "CFLAGS=-D_FORTIFY_SOURCE=0";
 }
-
-// stdenv.lib.optionalAttrs stdenv.isCygwin {
-  patchPhase =
-   # Make sure `error.c' gets compiled and is part of `libgettextlib.la'.
-   # This fixes:
-   # gettext-0.18.1.1/gettext-tools/src/msgcmp.c:371: undefined reference to `_error_message_count'
-
-   '' sed -i gettext-tools/gnulib-lib/Makefile.in \
-          -e 's/am_libgettextlib_la_OBJECTS =/am_libgettextlib_la_OBJECTS = error.lo/g'
-   '';
-})

@@ -1,22 +1,52 @@
-{ stdenv, fetchgit, buildPythonPackage, pythonPackages }:
+{ stdenv, fetchFromGitHub, python2Packages, gnupg1orig, openssl, git }:
 
-buildPythonPackage rec {
-  name = "mailpile-dev";
+python2Packages.buildPythonApplication rec {
+  pname = "mailpile";
+  version = "1.0.0rc2";
 
-  src = fetchgit {
-    url = "https://github.com/pagekite/Mailpile.git";
-    rev = "6e19c1942541dbdefb5155db5f2583bf3ed22aeb";
-    sha256 = "04idlbjkasigq3vslcv33kg21rjyklm2yl8pyrf5h94lzabbl1fs";
+  src = fetchFromGitHub {
+    owner = "mailpile";
+    repo = "Mailpile";
+    rev = version;
+    sha256 = "1z5psh00fjr8gnl4yjcl4m9ywfj24y1ffa2rfb5q8hq4ksjblbdj";
   };
 
-  propagatedBuildInputs = with pythonPackages; [
-    pillow jinja2 spambayes pythonPackages."lxml-2.3.6" python.modules.readline or null];
+  postPatch = ''
+    patchShebangs scripts
+  '';
+
+  nativeBuildInputs = with python2Packages; [ pbr git ];
+  PBR_VERSION=version;
+
+  propagatedBuildInputs = with python2Packages; [
+    appdirs
+    cryptography
+    fasteners
+    gnupg1orig
+    jinja2
+    pgpdump
+    pillow
+    python2Packages.lxml
+    spambayes
+  ];
+
+  postInstall = ''
+    wrapProgram $out/bin/mailpile \
+      --prefix PATH ":" "${stdenv.lib.makeBinPath [ gnupg1orig openssl ]}" \
+      --set-default MAILPILE_SHARED "$out/share/mailpile"
+  '';
+
+  # No tests were found
+  doCheck = false;
 
   meta = with stdenv.lib; {
     description = "A modern, fast web-mail client with user-friendly encryption and privacy features";
     homepage = https://www.mailpile.is/;
-    license = map (getAttr "shortName") [ licenses.asl20 licenses.agpl3 ];
+    license = [ licenses.asl20 licenses.agpl3 ];
     platforms = platforms.linux;
-    maintainers = [ maintainers.iElectric ];
+    maintainers = [ maintainers.domenkozar ];
+    knownVulnerabilities = [
+      "Numerous and uncounted, upstream has requested we not package it. See more: https://github.com/NixOS/nixpkgs/pull/23058#issuecomment-283515104"
+    ];
   };
 }

@@ -1,22 +1,30 @@
 {stdenv, fetchurl, cyrus_sasl, libevent}:
 
 stdenv.mkDerivation rec {
-  name = "memcached-1.4.17";
+  version = "1.5.18";
+  pname = "memcached";
 
   src = fetchurl {
-    url = "http://memcached.org/files/${name}.tar.gz";
-    sha1 = "2b4fc706d39579cf355e3358cfd27b44d40bd79c";
+    url = "https://memcached.org/files/${pname}-${version}.tar.gz";
+    sha256 = "127g4l0ilb376dpgz6qby24vc72ban35c938dzmp1nh6bdqddgcy";
   };
+
+  configureFlags = [
+     "ac_cv_c_endian=${if stdenv.hostPlatform.isBigEndian then "big" else "little"}"
+  ];
 
   buildInputs = [cyrus_sasl libevent];
 
-  meta = {
+  hardeningEnable = [ "pie" ];
+
+  NIX_CFLAGS_COMPILE = stdenv.lib.optionalString stdenv.isDarwin "-Wno-error";
+
+  meta = with stdenv.lib; {
     description = "A distributed memory object caching system";
     repositories.git = https://github.com/memcached/memcached.git;
     homepage = http://memcached.org/;
-    license = "bsd";
-    maintainers = [ stdenv.lib.maintainers.coconnor ];
-    platforms = stdenv.lib.platforms.linux;
+    license = licenses.bsd3;
+    maintainers = [ maintainers.coconnor ];
+    platforms = platforms.linux ++ platforms.darwin;
   };
 }
-

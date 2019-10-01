@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 with lib;
 let
   cfg = config.services.jenkinsSlave;
@@ -23,7 +23,7 @@ in {
 
       user = mkOption {
         default = "jenkins";
-        type = with types; string;
+        type = types.str;
         description = ''
           User the jenkins slave agent should execute under.
         '';
@@ -31,7 +31,7 @@ in {
 
       group = mkOption {
         default = "jenkins";
-        type = with types; string;
+        type = types.str;
         description = ''
           If the default slave agent user "jenkins" is configured then this is
           the primary group of that user.
@@ -40,7 +40,7 @@ in {
 
       home = mkOption {
         default = "/var/lib/jenkins";
-        type = with types; string;
+        type = types.path;
         description = ''
           The path to use as JENKINS_HOME. If the default user "jenkins" is configured then
           this is the home of the "jenkins" user.
@@ -50,12 +50,12 @@ in {
   };
 
   config = mkIf (cfg.enable && !masterCfg.enable) {
-    users.extraGroups = optional (cfg.group == "jenkins") {
+    users.groups = optional (cfg.group == "jenkins") {
       name = "jenkins";
       gid = config.ids.gids.jenkins;
     };
 
-    users.extraUsers = optional (cfg.user == "jenkins") {
+    users.users = optional (cfg.user == "jenkins") {
       name = "jenkins";
       description = "jenkins user";
       createHome = true;

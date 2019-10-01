@@ -3,7 +3,7 @@ let
   cfg = config.services.fourStore;
   stateDir = "/var/lib/4store";
   fourStoreUser = "fourstore";
-  run = "${pkgs.su}/bin/su -s ${pkgs.stdenv.shell} ${fourStoreUser}";
+  run = "${pkgs.su}/bin/su -s ${pkgs.runtimeShell} ${fourStoreUser}";
 in
 with lib;
 {
@@ -43,7 +43,7 @@ with lib;
         message = "Must specify 4Store database name.";
       };
 
-    users.extraUsers = singleton
+    users.users = singleton
       { name = fourStoreUser;
         uid = config.ids.uids.fourstore;
         description = "4Store database user";
@@ -52,9 +52,9 @@ with lib;
 
     services.avahi.enable = true;
 
-    jobs.fourStore = {
-      name = "4store";
-      startOn = "filesystem";
+    systemd.services."4store" = {
+      after = [ "network.target" ];
+      wantedBy = [ "multi-user.target" ];
 
       preStart = ''
         mkdir -p ${stateDir}/
@@ -64,11 +64,9 @@ with lib;
         fi
       '';
 
-      exec = ''
+      script = ''
         ${run} -c '${pkgs.rdf4store}/bin/4s-backend -D ${cfg.options} ${cfg.database}'
       '';
     };
-
   };
-
 }

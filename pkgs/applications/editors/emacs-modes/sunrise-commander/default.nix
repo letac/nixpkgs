@@ -1,6 +1,6 @@
 {stdenv, fetchgit, emacs}:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   name = "sunrise-commander-6r435";
 
   src = fetchgit {
@@ -23,7 +23,7 @@ stdenv.mkDerivation rec {
   meta = {
     description = "Two-pane file manager for Emacs based on Dired and inspired by MC";
     homepage = http://www.emacswiki.org/emacs/Sunrise_Commander;
-    license = "GPLv3+";
+    license = stdenv.lib.licenses.gpl3Plus;
 
     platforms = stdenv.lib.platforms.all;
   };

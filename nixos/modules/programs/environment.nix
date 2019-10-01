@@ -2,7 +2,7 @@
 
 # Most of the stuff here should probably be moved elsewhere sometime.
 
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 
 with lib;
 
@@ -17,52 +17,36 @@ in
   config = {
 
     environment.variables =
-      { LOCATE_PATH = "/var/cache/locatedb";
-        NIXPKGS_CONFIG = "/etc/nix/nixpkgs-config.nix";
+      { NIXPKGS_CONFIG = "/etc/nix/nixpkgs-config.nix";
         PAGER = mkDefault "less -R";
         EDITOR = mkDefault "nano";
+        XDG_CONFIG_DIRS = [ "/etc/xdg" ]; # needs to be before profile-relative paths to allow changes through environment.etc
+        GTK_DATA_PREFIX = "${config.system.path}"; # needed for gtk2 apps to find themes
+        GTK_EXE_PREFIX = "${config.system.path}";
       };
 
-    environment.sessionVariables =
-      { NIX_PATH =
-          [ "/nix/var/nix/profiles/per-user/root/channels/nixos"
-            "nixpkgs=/etc/nixos/nixpkgs"
-            "nixos-config=/etc/nixos/configuration.nix"
-          ];
-      };
-
-    environment.profiles =
-      [ "$HOME/.nix-profile"
-        "/nix/var/nix/profiles/default"
+    environment.profiles = mkAfter
+      [ "/nix/var/nix/profiles/default"
         "/run/current-system/sw"
       ];
 
-    # !!! fix environment.profileVariables definition and then move
-    # most of these elsewhere
-    environment.profileVariables = (i:
-      { PATH = [ "${i}/bin" "${i}/sbin" "${i}/lib/kde4/libexec" ];
-        MANPATH = [ "${i}/man" "${i}/share/man" ];
-        INFOPATH = [ "${i}/info" "${i}/share/info" ];
-        PKG_CONFIG_PATH = [ "${i}/lib/pkgconfig" ];
-        TERMINFO_DIRS = [ "${i}/share/terminfo" ];
-        PERL5LIB = [ "${i}/lib/perl5/site_perl" ];
-        ALSA_PLUGIN_DIRS = [ "${i}/lib/alsa-lib" ];
-        GST_PLUGIN_SYSTEM_PATH = [ "${i}/lib/gstreamer-0.10" ];
-        KDEDIRS = [ "${i}" ];
-        STRIGI_PLUGIN_PATH = [ "${i}/lib/strigi/" ];
-        QT_PLUGIN_PATH = [ "${i}/lib/qt4/plugins" "${i}/lib/kde4/plugins" ];
-        QTWEBKIT_PLUGIN_PATH = [ "${i}/lib/mozilla/plugins/" ];
-        GTK_PATH = [ "${i}/lib/gtk-2.0" ];
-        XDG_CONFIG_DIRS = [ "${i}/etc/xdg" ];
-        XDG_DATA_DIRS = [ "${i}/share" ];
-        MOZ_PLUGIN_PATH = [ "${i}/lib/mozilla/plugins" ];
-      });
+    # TODO: move most of these elsewhere
+    environment.profileRelativeSessionVariables =
+      { PATH = [ "/bin" ];
+        INFOPATH = [ "/info" "/share/info" ];
+        KDEDIRS = [ "" ];
+        STRIGI_PLUGIN_PATH = [ "/lib/strigi/" ];
+        QT_PLUGIN_PATH = [ "/lib/qt4/plugins" "/lib/kde4/plugins" ];
+        QTWEBKIT_PLUGIN_PATH = [ "/lib/mozilla/plugins/" ];
+        GTK_PATH = [ "/lib/gtk-2.0" "/lib/gtk-3.0" ];
+        XDG_CONFIG_DIRS = [ "/etc/xdg" ];
+        XDG_DATA_DIRS = [ "/share" ];
+        MOZ_PLUGIN_PATH = [ "/lib/mozilla/plugins" ];
+        LIBEXEC_PATH = [ "/lib/libexec" ];
+      };
 
     environment.extraInit =
       ''
-         # reset TERM with new TERMINFO available (if any)
-         export TERM=$TERM
-
          unset ASPELL_CONF
          for i in ${concatStringsSep " " (reverseList cfg.profiles)} ; do
            if [ -d "$i/lib/aspell" ]; then

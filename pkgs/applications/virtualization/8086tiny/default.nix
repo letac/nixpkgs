@@ -1,13 +1,12 @@
 { stdenv, fetchurl
 , localBios ? true, nasm ? null
-, sdlSupport ? true, SDL ? null
-}:
+, sdlSupport ? true, SDL ? null }:
 
 assert sdlSupport -> (SDL != null);
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
 
-  name = "8086tiny-${version}";
+  pname = "8086tiny";
   version = "1.25";
 
   src = fetchurl {

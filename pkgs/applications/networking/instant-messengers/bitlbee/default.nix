@@ -1,23 +1,42 @@
-{ fetchurl, stdenv, gnutls, glib, pkgconfig, check, libotr }:
+{ fetchurl, stdenv, gnutls, glib, pkgconfig, check, libotr, python
+, enableLibPurple ? false, pidgin ? null
+, enablePam ? false, pam ? null
+}:
 
+with stdenv.lib;
 stdenv.mkDerivation rec {
-  name = "bitlbee-3.2";
+  name = "bitlbee-3.6";
 
   src = fetchurl {
     url = "mirror://bitlbee/src/${name}.tar.gz";
-    sha256 = "1b43828e906f5450993353f2ebecc6c038f0261c4dc3f1722ebafa6ea3e62030";
+    sha256 = "0zhhcbcr59sx9h4maf8zamzv2waya7sbsl7w74gbyilvy93dw5cz";
   };
 
-  buildInputs = [ gnutls glib pkgconfig libotr ]
-    ++ stdenv.lib.optional doCheck check;
+  nativeBuildInputs = [ pkgconfig ] ++ optional doCheck check;
 
-  configureFlags = [ "--otr=1" ];
+  buildInputs = [ gnutls glib libotr python ]
+    ++ optional enableLibPurple pidgin
+    ++ optional enablePam pam;
 
-  preCheck = "mkdir tests/.depend";
-  doCheck = true;
+  configureFlags = [
+    "--otr=1"
+    "--ssl=gnutls"
+    "--pidfile=/var/lib/bitlbee/bitlbee.pid"
+  ] ++ optional enableLibPurple "--purple=1"
+    ++ optional enablePam "--pam=1";
+
+  installTargets = [ "install" "install-dev" ];
+
+  doCheck = !enableLibPurple; # Checks fail with libpurple for some reason
+  checkPhase = ''
+    # check flags set VERBOSE=y which breaks the build due overriding a command
+    make check
+  '';
+
+  enableParallelBuilding = true;
 
   meta = {
-    description = "BitlBee, an IRC to other chat networks gateway";
+    description = "IRC instant messaging gateway";
 
     longDescription = ''
       BitlBee brings IM (instant messaging) to IRC clients.  It's a
@@ -30,10 +49,10 @@ stdenv.mkDerivation rec {
       Messenger, AIM and ICQ.
     '';
 
-    homepage = http://www.bitlbee.org/;
-    license = "GPLv2+";
+    homepage = https://www.bitlbee.org/;
+    license = licenses.gpl2Plus;
 
-    maintainers = [ stdenv.lib.maintainers.ludo ];
-    platforms = stdenv.lib.platforms.gnu;  # arbitrary choice
+    maintainers = with maintainers; [ pSub ];
+    platforms = platforms.gnu ++ platforms.linux;  # arbitrary choice
   };
 }

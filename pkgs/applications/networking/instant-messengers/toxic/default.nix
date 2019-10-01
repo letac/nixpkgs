@@ -1,40 +1,32 @@
-{ stdenv, fetchurl, autoconf, libtool, automake, libsodium, ncurses
-, libtoxcore, pkgconfig }:
+{ stdenv, fetchFromGitHub, libsodium, ncurses, curl
+, libtoxcore, openal, libvpx, freealut, libconfig, pkgconfig, libopus
+, qrencode, gdk-pixbuf, libnotify }:
 
-let
-  version = "b308e19e6b";
-  date = "20140224";
-in
 stdenv.mkDerivation rec {
-  name = "toxic-${date}-${version}";
+  pname = "toxic";
+  version = "0.8.3";
 
-  src = fetchurl {
-    url = "https://github.com/Tox/toxic/tarball/${version}";
-    name = "${name}.tar.gz";
-    sha256 = "0fgkvnpy3dl2h378h796z9md0zg05b3174fgx17b919av6j9x4ma";
+  src = fetchFromGitHub {
+    owner  = "Tox";
+    repo   = "toxic";
+    rev    = "v${version}";
+    sha256 = "09l2j3lwvrq7bf3051vjsnml9w63790ly3iylgf26gkrmld6k31w";
   };
 
-  preConfigure = ''
-    autoreconf -i
-  '';
+  makeFlags = [ "PREFIX=$(out)"];
+  installFlags = [ "PREFIX=$(out)"];
 
-  NIX_LDFLAGS = "-lsodium";
-
-  configureFlags = [
-    "--with-libtoxcore-headers=${libtoxcore}/include"
-    "--with-libtoxcore-libs=${libtoxcore}/lib" 
-    "--with-libsodium-headers=${libtoxcore}/include"
-    "--with-libsodium-libs=${libtoxcore}/lib" 
+  buildInputs = [
+    libtoxcore libsodium ncurses curl gdk-pixbuf libnotify
+  ] ++ stdenv.lib.optionals (!stdenv.isAarch32) [
+    openal libopus libvpx freealut qrencode
   ];
+  nativeBuildInputs = [ pkgconfig libconfig ];
 
-  buildInputs = [ autoconf libtool automake libtoxcore libsodium ncurses pkgconfig ];
-
-  doCheck = true;
-
-  meta = {
+  meta = with stdenv.lib; {
     description = "Reference CLI for Tox";
-    license = "GPLv3+";
-    maintainers = with stdenv.lib.maintainers; [ viric ];
-    platforms = stdenv.lib.platforms.all;
+    license = licenses.gpl3Plus;
+    maintainers = with maintainers; [ ];
+    platforms = platforms.linux;
   };
 }

@@ -12,27 +12,29 @@ let
     ''
       xauth_path ${dmcfg.xauthBin}
       default_xserver ${dmcfg.xserverBin}
-      xserver_arguments ${dmcfg.xserverArgs}
-      sessiondir ${dmcfg.session.desktops}
-      login_cmd exec ${pkgs.stdenv.shell} ${dmcfg.session.script} "%session"
+      xserver_arguments ${toString dmcfg.xserverArgs}
+      sessiondir ${dmcfg.session.desktops}/share/xsessions
+      login_cmd exec ${pkgs.runtimeShell} ${dmcfg.session.wrapper} "%session"
       halt_cmd ${config.systemd.package}/sbin/shutdown -h now
       reboot_cmd ${config.systemd.package}/sbin/shutdown -r now
+      logfile /dev/stderr
       ${optionalString (cfg.defaultUser != null) ("default_user " + cfg.defaultUser)}
+      ${optionalString (cfg.defaultUser != null) ("focus_password yes")}
       ${optionalString cfg.autoLogin "auto_login yes"}
+      ${optionalString (cfg.consoleCmd != null) "console_cmd ${cfg.consoleCmd}"}
+      ${cfg.extraConfig}
     '';
 
   # Unpack the SLiM theme, or use the default.
   slimThemesDir =
     let
-      unpackedTheme = pkgs.stdenv.mkDerivation {
-        name = "slim-theme";
-        buildCommand = ''
-          ensureDir $out
+      unpackedTheme = pkgs.runCommand "slim-theme" { preferLocalBuild = true; }
+        ''
+          mkdir -p $out
           cd $out
           unpackFile ${cfg.theme}
           ln -s * default
         '';
-      };
     in if cfg.theme == null then "${pkgs.slim}/share/slim/themes" else unpackedTheme;
 
 in
@@ -47,7 +49,7 @@ in
 
       enable = mkOption {
         type = types.bool;
-        default = config.services.xserver.enable;
+        default = false;
         description = ''
           Whether to enable SLiM as the display manager.
         '';
@@ -55,7 +57,14 @@ in
 
       theme = mkOption {
         type = types.nullOr types.path;
-        default = null;
+        default = pkgs.fetchurl {
+          url = "https://github.com/jagajaga/nixos-slim-theme/archive/2.0.tar.gz";
+          sha256 = "0lldizhigx7bjhxkipii87y432hlf5wdvamnfxrryf9z7zkfypc8";
+        };
+        defaultText = ''pkgs.fetchurl {
+          url = "https://github.com/jagajaga/nixos-slim-theme/archive/2.0.tar.gz";
+          sha256 = "0lldizhigx7bjhxkipii87y432hlf5wdvamnfxrryf9z7zkfypc8";
+        }'';
         example = literalExample ''
           pkgs.fetchurl {
             url = "mirror://sourceforge/slim.berlios/slim-wave.tar.gz";
@@ -89,6 +98,27 @@ in
         '';
       };
 
+      extraConfig = mkOption {
+        type = types.lines;
+        default = "";
+        description = ''
+          Extra configuration options for SLiM login manager. Do not
+          add options that can be configured directly.
+        '';
+      };
+
+      consoleCmd = mkOption {
+        type = types.nullOr types.str;
+        default = ''
+          ${pkgs.xterm}/bin/xterm -C -fg white -bg black +sb -T "Console login" -e ${pkgs.shadow}/bin/login
+        '';
+        defaultText = ''
+          ''${pkgs.xterm}/bin/xterm -C -fg white -bg black +sb -T "Console login" -e ''${pkgs.shadow}/bin/login
+        '';
+        description = ''
+          The command to run when "console" is given as the username.
+        '';
+      };
     };
 
   };
@@ -99,11 +129,7 @@ in
   config = mkIf cfg.enable {
 
     services.xserver.displayManager.job =
-      { preStart =
-          ''
-            rm -f /var/log/slim.log
-          '';
-        environment =
+      { environment =
           { SLIM_CFGFILE = slimConfig;
             SLIM_THEMESDIR = slimThemesDir;
           };

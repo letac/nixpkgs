@@ -1,32 +1,26 @@
-{stdenv, fetchurl, ocaml, findlib, easy-format}:
-let
+{ stdenv, fetchFromGitHub, buildDunePackage, easy-format }:
+
+buildDunePackage rec {
   pname = "biniou";
-  version = "1.0.9";
-  webpage = "http://mjambon.com/${pname}.html";
-in
-stdenv.mkDerivation rec {
+  version = "1.2.0";
 
-  name = "${pname}-${version}";
-
-  src = fetchurl {
-    url = "http://mjambon.com/releases/${pname}/${name}.tar.gz";
-    sha256 = "14j3hrhbjqxbizr1pr8fcig9dmfzhbjjwzwyc99fcsdic67w8izb";
+  src = fetchFromGitHub {
+    owner = "mjambon";
+    repo = pname;
+    rev = "v${version}";
+    sha256 = "0mjpgwyfq2b2izjw0flmlpvdjgqpq8shs89hxj1np2r50csr8dcb";
   };
 
-  buildInputs = [ ocaml findlib easy-format ];
+  propagatedBuildInputs = [ easy-format ];
 
-  createFindlibDestdir = true;
-
-  makeFlags = "PREFIX=$(out)";
-
-  preBuild = ''
-    mkdir $out/bin
+  postPatch = ''
+   patchShebangs .
   '';
 
   meta = {
-    description = "A binary data format designed for speed, safety, ease of use and backward compatibility as protocols evolve";
-    homepage = "${webpage}";
+    inherit (src.meta) homepage;
+    description = "Binary data format designed for speed, safety, ease of use and backward compatibility as protocols evolve";
+    maintainers = [ stdenv.lib.maintainers.vbgl ];
     license = stdenv.lib.licenses.bsd3;
-    platforms = ocaml.meta.platforms;
   };
 }

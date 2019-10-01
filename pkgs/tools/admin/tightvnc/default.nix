@@ -1,4 +1,5 @@
-{stdenv, fetchurl, x11, zlib, libjpeg, imake, gccmakedep, libXmu, libXaw, libXpm, libXp , perl, xauth, fontDirectories}:
+{ stdenv, fetchurl, xlibsWrapper, zlib, libjpeg, imake, gccmakedep, libXmu
+, libXaw, libXpm, libXp , perl, xauth, fontDirectories, openssh }:
 
 stdenv.mkDerivation {
   name = "tightvnc-1.3.10";
@@ -9,16 +10,60 @@ stdenv.mkDerivation {
   };
 
   # for the builder script
-  inherit xauth fontDirectories perl;
-  gcc = stdenv.gcc.gcc;
+  inherit fontDirectories;
 
-  buildInputs = [x11 zlib libjpeg imake gccmakedep libXmu libXaw libXpm libXp xauth];
-  builder = ./builder.sh;
+  hardeningDisable = [ "format" ];
+
+  buildInputs = [ xlibsWrapper zlib libjpeg imake gccmakedep libXmu libXaw
+                  libXpm libXp xauth openssh ];
+
+  postPatch = ''
+    fontPath=
+    for i in $fontDirectories; do
+      for j in $(find $i -name fonts.dir); do
+        addToSearchPathWithCustomDelimiter "," fontPath $(dirname $j)
+      done
+    done
+
+    sed -i "s@/usr/bin/ssh@${openssh}/bin/ssh@g" vncviewer/vncviewer.h
+
+    sed -e 's@/usr/bin/perl@${perl}/bin/perl@' \
+        -e 's@unix/:7100@'$fontPath'@' \
+        -i vncserver
+
+    sed -e 's@.* CppCmd .*@#define CppCmd		cpp@' -i Xvnc/config/cf/linux.cf
+    sed -e 's@.* CppCmd .*@#define CppCmd		cpp@' -i Xvnc/config/cf/Imake.tmpl
+    sed -i \
+        -e 's@"uname","xauth","Xvnc","vncpasswd"@"uname","Xvnc","vncpasswd"@g' \
+        -e "s@\<xauth\>@${xauth}/bin/xauth@g" \
+        vncserver
+  '';
+
+  preInstall = ''
+    mkdir -p $out/bin
+    mkdir -p $out/share/man/man1
+  '';
+
+  installPhase = ''
+    runHook preInstall
+
+    ./vncinstall $out/bin $out/share/man
+
+    runHook postInstall
+  '';
+
+  postInstall = ''
+    # fix HTTP client:
+    mkdir -p $out/share/tightvnc
+    cp -r classes $out/share/tightvnc
+    substituteInPlace $out/bin/vncserver \
+      --replace /usr/local/vnc/classes $out/share/tightvnc/classes
+  '';
 
   meta = {
-    license = "GPLv2+";
-    homepage = "http://vnc-tight.sourceforge.net/";
-    description = "TightVNC is an improved version of VNC";
+    license = stdenv.lib.licenses.gpl2Plus;
+    homepage = http://vnc-tight.sourceforge.net/;
+    description = "Improved version of VNC";
 
     longDescription = ''
       TightVNC is an improved version of VNC, the great free

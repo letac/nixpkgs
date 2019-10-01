@@ -30,11 +30,9 @@ stdenv.mkDerivation rec {
          to build native threading applications for Microsoft Windows.
       '';
 
-    homepage = http://www.gnu.org/software/commoncpp/;
-    license = "GPLv2+";
-    maintainers = [ stdenv.lib.maintainers.marcweber
-                    stdenv.lib.maintainers.ludo
-                  ];
-    platforms = stdenv.lib.platforms.allBut "i686-freebsd";
+    homepage = https://www.gnu.org/software/commoncpp/;
+    license = stdenv.lib.licenses.gpl2Plus;
+    maintainers = [ stdenv.lib.maintainers.marcweber ];
+    platforms = with stdenv.lib.platforms; linux;
   };
 }

@@ -1,11 +1,11 @@
-{ fetchurl, stdenv, python
+{ fetchurl, stdenv, python2
 
 , enableStandardFeatures ? false
 , sourceHighlight ? null
 , highlight ? null
 , pygments ? null
 , graphviz ? null
-, tetex ? null
+, texlive ? null
 , dblatexFull ? null
 , libxslt ? null
 , w3m ? null
@@ -14,7 +14,7 @@
 , lilypond ? null
 , libxml2 ? null
 , docbook_xml_dtd_45 ? null
-, docbook5_xsl ? null
+, docbook_xsl_ns ? null
 , docbook_xsl ? null
 , fop ? null
 # TODO: Package this:
@@ -22,6 +22,10 @@
 , gnused ? null
 , coreutils ? null
 
+# if true, enable all the below filters and backends
+, enableExtraPlugins ? false
+
+# unzip is needed to extract filter and backend plugins
 , unzip ? null
 # filters
 , enableDitaaFilter ? false, jre ? null
@@ -33,6 +37,9 @@
 # backends
 , enableDeckjsBackend ? false
 , enableOdfBackend ? false
+
+# java is problematic on some platforms, where it is unfree
+, enableJava ? true
 }:
 
 assert enableStandardFeatures ->
@@ -40,7 +47,7 @@ assert enableStandardFeatures ->
   highlight != null &&
   pygments != null &&
   graphviz != null &&
-  tetex != null &&
+  texlive != null &&
   dblatexFull != null &&
   libxslt != null &&
   w3m != null &&
@@ -49,25 +56,34 @@ assert enableStandardFeatures ->
   lilypond != null &&
   libxml2 != null &&
   docbook_xml_dtd_45 != null &&
-  docbook5_xsl != null &&
+  docbook_xsl_ns != null &&
   docbook_xsl != null &&
-  fop != null &&
+  (fop != null || !enableJava) &&
 # TODO: Package this:
 #  epubcheck != null &&
   gnused != null &&
   coreutils != null;
 
 # filters
-assert (enableDitaaFilter || enableMscgenFilter || enableDiagFilter || enableQrcodeFilter || enableAafigureFilter) -> unzip != null;
-assert enableDitaaFilter -> jre != null;
-assert enableMscgenFilter -> mscgen != null;
-assert enableDiagFilter -> blockdiag != null && seqdiag != null && actdiag != null && nwdiag != null;
-assert enableMatplotlibFilter -> matplotlib != null && numpy != null;
-assert enableAafigureFilter -> aafigure != null && recursivePthLoader != null;
+assert enableExtraPlugins || enableDitaaFilter || enableMscgenFilter || enableDiagFilter || enableQrcodeFilter || enableAafigureFilter -> unzip != null;
+assert (enableExtraPlugins && enableJava) || enableDitaaFilter -> jre != null;
+assert enableExtraPlugins || enableMscgenFilter -> mscgen != null;
+assert enableExtraPlugins || enableDiagFilter -> blockdiag != null && seqdiag != null && actdiag != null && nwdiag != null;
+assert enableExtraPlugins || enableMatplotlibFilter -> matplotlib != null && numpy != null;
+assert enableExtraPlugins || enableAafigureFilter -> aafigure != null && recursivePthLoader != null;
 # backends
-assert (enableDeckjsBackend || enableOdfBackend) -> unzip != null;
+assert enableExtraPlugins || enableDeckjsBackend || enableOdfBackend -> unzip != null;
 
 let
+
+  _enableDitaaFilter = (enableExtraPlugins && enableJava) || enableDitaaFilter;
+  _enableMscgenFilter = enableExtraPlugins || enableMscgenFilter;
+  _enableDiagFilter = enableExtraPlugins || enableDiagFilter;
+  _enableQrcodeFilter = enableExtraPlugins || enableQrcodeFilter;
+  _enableMatplotlibFilter = enableExtraPlugins || enableMatplotlibFilter;
+  _enableAafigureFilter = enableExtraPlugins || enableAafigureFilter;
+  _enableDeckjsBackend = enableExtraPlugins || enableDeckjsBackend;
+  _enableOdfBackend = enableExtraPlugins || enableOdfBackend;
 
   #
   # filters
@@ -95,7 +111,7 @@ let
   };
 
   # there are no archives or tags, using latest commit in master branch as per 2013-09-22
-  matplotlibFilterSrc = let commit = "75f0d009629f93f33fab04b83faca20cc35dd358"; in fetchurl rec {
+  matplotlibFilterSrc = let commit = "75f0d009629f93f33fab04b83faca20cc35dd358"; in fetchurl {
     name = "mplw-${commit}.tar.gz";
     url = "https://api.github.com/repos/lvv/mplw/tarball/${commit}";
     sha256 = "0yfhkm2dr8gnp0fcg25x89hwiymkri2m5cyqzmzragzwj0hbmcf1";
@@ -135,23 +151,23 @@ stdenv.mkDerivation rec {
     sha256 = "1w71nk527lq504njmaf0vzr93pgahkgzzxzglrq6bay8cw2rvnvq";
   };
 
-  buildInputs = [ python unzip ];
+  buildInputs = [ python2 unzip ];
 
   # install filters early, so their shebangs are patched too
   patchPhase = with stdenv.lib; ''
     mkdir -p "$out/etc/asciidoc/filters"
     mkdir -p "$out/etc/asciidoc/backends"
-  '' + optionalString enableDitaaFilter ''
+  '' + optionalString _enableDitaaFilter ''
     echo "Extracting ditaa filter"
     unzip -d "$out/etc/asciidoc/filters/ditaa" "${ditaaFilterSrc}"
     sed -i -e "s|java -jar|${jre}/bin/java -jar|" \
         "$out/etc/asciidoc/filters/ditaa/ditaa2img.py"
-  '' + optionalString enableMscgenFilter ''
+  '' + optionalString _enableMscgenFilter ''
     echo "Extracting mscgen filter"
     unzip -d "$out/etc/asciidoc/filters/mscgen" "${mscgenFilterSrc}"
     sed -i -e "s|filter-wrapper.py mscgen|filter-wrapper.py ${mscgen}/bin/mscgen|" \
         "$out/etc/asciidoc/filters/mscgen/mscgen-filter.conf"
-  '' + optionalString enableDiagFilter ''
+  '' + optionalString _enableDiagFilter ''
     echo "Extracting diag filter"
     unzip -d "$out/etc/asciidoc/filters/diag" "${diagFilterSrc}"
     sed -i \
@@ -161,12 +177,12 @@ stdenv.mkDerivation rec {
         -e "s|filter='nwdiag|filter=\'${nwdiag}/bin/nwdiag|" \
         -e "s|filter='packetdiag|filter=\'${nwdiag}/bin/packetdiag|" \
         "$out/etc/asciidoc/filters/diag/diag-filter.conf"
-  '' + optionalString enableQrcodeFilter ''
+  '' + optionalString _enableQrcodeFilter ''
     echo "Extracting qrcode filter"
     unzip -d "$out/etc/asciidoc/filters/qrcode" "${qrcodeFilterSrc}"
     sed -i -e "s|systemcmd('qrencode|systemcmd('${qrencode}/bin/qrencode|" \
         "$out/etc/asciidoc/filters/qrcode/qrcode2img.py"
-  '' + optionalString enableMatplotlibFilter ''
+  '' + optionalString _enableMatplotlibFilter ''
     echo "Extracting mpl (matplotlib) filter"
     mkdir -p "$out/etc/asciidoc/filters/mpl"
     tar xvf "${matplotlibFilterSrc}" -C "$out/etc/asciidoc/filters/mpl" --strip-components=1
@@ -177,7 +193,7 @@ stdenv.mkDerivation rec {
     numpy_path="$(toPythonPath ${numpy})"
     sed -i "/^import.*sys/asys.path.append(\"$matplotlib_path\"); sys.path.append(\"$numpy_path\");" \
         "$out/etc/asciidoc/filters/mpl/mplw.py"
-  '' + optionalString enableAafigureFilter ''
+  '' + optionalString _enableAafigureFilter ''
     echo "Extracting aafigure filter"
     unzip -d "$out/etc/asciidoc/filters/aafigure" "${aafigureFilterSrc}"
     # Add aafigure to sys.path (and it needs recursive-pth-loader)
@@ -185,10 +201,10 @@ stdenv.mkDerivation rec {
     aafigure_path="$(toPythonPath ${aafigure})"
     sed -i "/^import.*sys/asys.path.append(\"$pth_loader_path\"); sys.path.append(\"$aafigure_path\"); import sitecustomize" \
         "$out/etc/asciidoc/filters/aafigure/aafig2img.py"
-  '' + optionalString enableDeckjsBackend ''
+  '' + optionalString _enableDeckjsBackend ''
     echo "Extracting deckjs backend"
     unzip -d "$out/etc/asciidoc/backends/deckjs" "${deckjsBackendSrc}"
-  '' + optionalString enableOdfBackend ''
+  '' + optionalString _enableOdfBackend ''
     echo "Extracting odf backend (odt + odp)"
     unzip -d "$out/etc/asciidoc/backends/odt" "${odtBackendSrc}"
     unzip -d "$out/etc/asciidoc/backends/odp" "${odpBackendSrc}"
@@ -199,18 +215,18 @@ stdenv.mkDerivation rec {
   '' + optionalString enableStandardFeatures ''
     sed -e "s|dot|${graphviz}/bin/dot|g" \
         -e "s|neato|${graphviz}/bin/neato|g" \
-        -e "s|twopi|${graphviz}/bin/circo|g" \
+        -e "s|twopi|${graphviz}/bin/twopi|g" \
         -e "s|circo|${graphviz}/bin/circo|g" \
         -e "s|fdp|${graphviz}/bin/fdp|g" \
         -i "filters/graphviz/graphviz2png.py"
 
-    sed -e "s|run('latex|run('${tetex}/bin/latex|g" \
-        -e "s|cmd = 'dvipng'|cmd = '${tetex}/bin/dvipng'|g" \
+    sed -e "s|run('latex|run('${texlive}/bin/latex|g" \
+        -e "s|cmd = 'dvipng'|cmd = '${texlive}/bin/dvipng'|g" \
         -i "filters/latex/latex2png.py"
 
     sed -e "s|run('abc2ly|run('${lilypond}/bin/abc2ly|g" \
         -e "s|run('lilypond|run('${lilypond}/bin/lilypond|g" \
-        -e "s|run('convert|run('${imagemagick}/bin/convert|g" \
+        -e "s|run('convert|run('${imagemagick.out}/bin/convert|g" \
         -i "filters/music/music2png.py"
 
     sed -e 's|filter="source-highlight|filter="${sourceHighlight}/bin/source-highlight|' \
@@ -222,19 +238,20 @@ stdenv.mkDerivation rec {
     # use it to work around an impurity in the tetex package; tetex tools
     # cannot find their neighbours (e.g. pdflatex doesn't find mktextfm).
     # We can remove PATH= when those impurities are fixed.
-    sed -e "s|^ENV =.*|ENV = dict(XML_CATALOG_FILES='${docbook_xml_dtd_45}/xml/dtd/docbook/catalog.xml ${docbook5_xsl}/xml/xsl/docbook/catalog.xml ${docbook_xsl}/xml/xsl/docbook/catalog.xml', PATH='${tetex}/bin:${coreutils}/bin:${gnused}/bin')|" \
+    # TODO: Is this still necessary when using texlive?
+    sed -e "s|^ENV =.*|ENV = dict(XML_CATALOG_FILES='${docbook_xml_dtd_45}/xml/dtd/docbook/catalog.xml ${docbook_xsl_ns}/xml/xsl/docbook/catalog.xml ${docbook_xsl}/xml/xsl/docbook/catalog.xml', PATH='${stdenv.lib.makeBinPath [ texlive coreutils gnused ]}')|" \
         -e "s|^ASCIIDOC =.*|ASCIIDOC = '$out/bin/asciidoc'|" \
-        -e "s|^XSLTPROC =.*|XSLTPROC = '${libxslt}/bin/xsltproc'|" \
+        -e "s|^XSLTPROC =.*|XSLTPROC = '${libxslt.bin}/bin/xsltproc'|" \
         -e "s|^DBLATEX =.*|DBLATEX = '${dblatexFull}/bin/dblatex'|" \
-        -e "s|^FOP =.*|FOP = '${fop}/bin/fop'|" \
+        ${optionalString enableJava ''-e "s|^FOP =.*|FOP = '${fop}/bin/fop'|"''} \
         -e "s|^W3M =.*|W3M = '${w3m}/bin/w3m'|" \
         -e "s|^LYNX =.*|LYNX = '${lynx}/bin/lynx'|" \
-        -e "s|^XMLLINT =.*|XMLLINT = '${libxml2}/bin/xmllint'|" \
+        -e "s|^XMLLINT =.*|XMLLINT = '${libxml2.bin}/bin/xmllint'|" \
         -e "s|^EPUBCHECK =.*|EPUBCHECK = 'nixpkgs_is_missing_epubcheck'|" \
         -i a2x.py
   '' + ''
     for n in $(find "$out" . -name \*.py); do
-      sed -i -e "s,^#![[:space:]]*.*/bin/env python,#!${python}/bin/python,g" "$n"
+      sed -i -e "s,^#![[:space:]]*.*/bin/env python,#!${python2}/bin/python,g" "$n"
       chmod +x "$n"
     done
 
@@ -242,9 +259,10 @@ stdenv.mkDerivation rec {
   '';
 
   preInstall = "mkdir -p $out/etc/vim";
+  makeFlags = if stdenv.isCygwin then "DESTDIR=/." else null;
 
   meta = with stdenv.lib; {
-    description = "Text-based document generation system ${stdenv.lib.optionalString enableStandardFeatures "(full version)"}";
+    description = "Text-based document generation system";
     longDescription = ''
       AsciiDoc is a text document format for writing notes, documentation,
       articles, books, ebooks, slideshows, web pages, man pages and blogs.
@@ -255,9 +273,9 @@ stdenv.mkDerivation rec {
       the backend output markups (which can be almost any type of SGML/XML
       markup) can be customized and extended by the user.
     '';
-    homepage = "http://www.methods.co.nz/asciidoc/";
+    homepage = http://www.methods.co.nz/asciidoc/;
     license = licenses.gpl2Plus;
-    hydraPlatforms = platforms.linux;
+    platforms = platforms.unix;
     maintainers = [ maintainers.bjornfor ];
   };
 }

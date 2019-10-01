@@ -1,7 +1,7 @@
 {stdenv, fetchgit, perl}:
 
-stdenv.mkDerivation rec {
-  name = "colormake-${version}";
+stdenv.mkDerivation {
+  pname = "colormake";
   version = "2.1.0";
 
   buildInputs = [perl];
@@ -19,6 +19,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Simple wrapper around make to colorize the output";
-    license = "GPLv2";
+    license = stdenv.lib.licenses.gpl2;
+    platforms = stdenv.lib.platforms.unix;
   };
 }

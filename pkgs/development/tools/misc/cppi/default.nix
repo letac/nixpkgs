@@ -11,9 +11,9 @@ stdenv.mkDerivation rec {
   doCheck = true;
 
   meta = {
-    homepage = http://savannah.gnu.org/projects/cppi/;
+    homepage = https://savannah.gnu.org/projects/cppi/;
 
-    description = "GNU cppi, a cpp directive indenter";
+    description = "A C preprocessor directive indenter";
 
     longDescription =
       '' GNU cppi indents C preprocessor directives to reflect their nesting
@@ -23,9 +23,9 @@ stdenv.mkDerivation rec {
          to the level of nesting of that directive.
       '';
 
-    license = "GPLv3+";
+    license = stdenv.lib.licenses.gpl3Plus;
 
-    maintainers = [ stdenv.lib.maintainers.ludo ];
+    maintainers = [ ];
     platforms = stdenv.lib.platforms.all;
   };
 }

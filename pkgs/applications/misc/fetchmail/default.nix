@@ -4,7 +4,8 @@ let
   version = "6.3.26";
 in
 stdenv.mkDerivation {
-  name="fetchmail-${version}";
+  pname = "fetchmail";
+  inherit version;
 
   src = fetchurl {
     url = "mirror://sourceforge/fetchmail.berlios/fetchmail-${version}.tar.bz2";
@@ -13,11 +14,11 @@ stdenv.mkDerivation {
 
   buildInputs = [ openssl ];
 
-  configureFlags = "--with-ssl=${openssl}";
+  configureFlags = [ "--with-ssl=${openssl.dev}" ];
 
   meta = {
-    homepage = "http://www.fetchmail.info/";
-    description = "a full-featured remote-mail retrieval and forwarding utility";
+    homepage = http://www.fetchmail.info/;
+    description = "A full-featured remote-mail retrieval and forwarding utility";
     longDescription = ''
       A full-featured, robust, well-documented remote-mail retrieval and
       forwarding utility intended to be used over on-demand TCP/IP links
@@ -28,6 +29,7 @@ stdenv.mkDerivation {
     '';
 
     platforms = stdenv.lib.platforms.unix;
-    maintainers = [ stdenv.lib.maintainers.simons ];
+    maintainers = [ stdenv.lib.maintainers.peti ];
+    license = stdenv.lib.licenses.gpl2Plus;
   };
 }

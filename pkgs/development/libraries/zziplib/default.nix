@@ -1,22 +1,33 @@
-{ fetchurl, stdenv, perl, python, zip, xmlto, zlib }:
+{ docbook_xml_dtd_412, fetchurl, stdenv, perl, python2, zip, xmlto, zlib, fetchpatch }:
 
 stdenv.mkDerivation rec {
-  name = "zziplib-0.13.58";
+  pname = "zziplib";
+  version = "0.13.69";
 
   src = fetchurl {
-    url = "mirror://sourceforge/zziplib/${name}.tar.bz2";
-    sha256 = "13j9f6i8rx0qd5m96iwrcha78h34qpfk5qzi7cv098pms6gq022m";
+    url = "https://github.com/gdraheim/zziplib/archive/v${version}.tar.gz";
+    sha256 = "0i052a7shww0fzsxrdp3rd7g4mbzx7324a8ysbc0br7frpblcql4";
   };
 
-  patchPhase = ''
+  patches = [
+    (fetchpatch {
+      name = "CVE-2018-17828.patch";
+      url = "https://github.com/gdraheim/zziplib/commit/f609ae8971f3c0ce6.diff";
+      sha256 = "0jhiz4fgr93wzh6q03avn95b2nsf6402jaki6hxirxyhs5v9ahry";
+    })
+  ];
+  postPatch = ''
     sed -i -e s,--export-dynamic,, configure
   '';
 
-  buildInputs = [ perl python zip xmlto zlib ];
+  buildInputs = [ docbook_xml_dtd_412 perl python2 zip xmlto zlib ];
 
-  doCheck = true;
+  # tests are broken (https://github.com/gdraheim/zziplib/issues/20),
+  # and test/zziptests.py requires network access
+  # (https://github.com/gdraheim/zziplib/issues/24)
+  doCheck = false;
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "Library to extract data from files archived in a zip file";
 
     longDescription = ''
@@ -28,11 +39,11 @@ stdenv.mkDerivation rec {
       zip/unzip tools.
     '';
 
-    license = [ "LGPLv2+" "MPLv1.1" ];
+    license = with licenses; [ lgpl2Plus mpl11 ];
 
     homepage = http://zziplib.sourceforge.net/;
 
     maintainers = [ ];
-    platforms = python.meta.platforms;
+    platforms = python2.meta.platforms;
   };
 }

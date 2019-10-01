@@ -1,20 +1,28 @@
-{stdenv, fetchurl, unzip}:
+{ stdenv, fetchurl, makeWrapper, jre }:
 
-stdenv.mkDerivation {
-  name = "checkstyle-5.0";
-  buildInputs = [unzip] ; 
+stdenv.mkDerivation rec {
+  version = "8.24";
+  pname = "checkstyle";
 
   src = fetchurl {
-    url = mirror://sourceforge/checkstyle/checkstyle-5.0.zip ;
-    sha256 = "0972afcxjniz64hlnc89ddnd1d0mcd5hb1sd7lpw5k52h39683nh";
+    url = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-${version}/checkstyle-${version}-all.jar";
+    sha256 = "01h1xv6lqf1fhmzbghdj2dbygdspcb6dxk0fil16s2ggs3w62fmm";
   };
 
+  nativeBuildInputs = [ makeWrapper ];
+  buildInputs = [ jre ];
+
+  dontUnpack = true;
+
   installPhase = ''
-    mkdir -p $out/checkstyle
-    cp -R * $out/checkstyle
+    runHook preInstall
+    install -D $src $out/checkstyle/checkstyle-all.jar
+    makeWrapper ${jre}/bin/java $out/bin/checkstyle \
+      --add-flags "-jar $out/checkstyle/checkstyle-all.jar"
+    runHook postInstall
   '';
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "Checks Java source against a coding standard";
     longDescription = ''
       checkstyle is a development tool to help programmers write Java code that
@@ -22,6 +30,8 @@ stdenv.mkDerivation {
       Conventions, but is highly configurable.
     '';
     homepage = http://checkstyle.sourceforge.net/;
+    license = licenses.lgpl21;
+    maintainers = with maintainers; [ pSub ];
+    platforms = jre.meta.platforms;
   };
 }
-

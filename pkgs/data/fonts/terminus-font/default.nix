@@ -1,28 +1,25 @@
-{ stdenv, fetchurl, perl, bdftopcf, mkfontdir, mkfontscale }:
+{ stdenv, fetchurl, python3, bdftopcf, mkfontdir, mkfontscale }:
 
 stdenv.mkDerivation rec {
-  name = "terminus-font-4.38";
+  pname = "terminus-font";
+  version = "4.48"; # set here for use in URL below
 
   src = fetchurl {
-    url = "mirror://sourceforge/project/terminus-font/${name}/${name}.tar.gz";
-    sha256 = "1dwpxmg0wiyhp7hh18mvw18gnf0y2jgbn80c4xya7rmb9mm8gx7n";
+    url = "mirror://sourceforge/project/${pname}/${pname}-${version}/${pname}-${version}.tar.gz";
+    sha256 = "1bwlkj39rqbyq57v5yssayav6hzv1n11b9ml2s0dpiyfsn6rqy9l";
   };
 
-  buildInputs = [ perl bdftopcf mkfontdir mkfontscale ];
+  nativeBuildInputs = [ python3 bdftopcf mkfontdir mkfontscale ];
 
   patchPhase = ''
     substituteInPlace Makefile --replace 'fc-cache' '#fc-cache'
   '';
 
-  configurePhase = ''
-    sh ./configure --prefix=$out
-  '';
+  enableParallelBuilding = true;
 
-  installPhase = ''
-    make install fontdir
-  '';
+  installTargets = [ "install" "fontdir" ];
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "A clean fixed width font";
     longDescription = ''
       Terminus Font is designed for long (8 and more hours per day) work
@@ -36,9 +33,8 @@ stdenv.mkDerivation rec {
       16x32. The styles are normal and bold (except for 6x12), plus
       EGA/VGA-bold for 8x14 and 8x16.
     '';
-    homepage = http://www.is-vn.bg/hamster/;
-    license = [ "GPLv2+" ];
-    maintainers = with stdenv.lib.maintainers; [ astsmtl ];
-    platforms = with stdenv.lib.platforms; linux;
+    homepage = http://terminus-font.sourceforge.net/;
+    license = licenses.gpl2Plus;
+    maintainers = with maintainers; [ astsmtl ];
   };
 }

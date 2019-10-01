@@ -1,16 +1,20 @@
-{stdenv, fetchurl, ocaml, findlib, camomile, ounit}:
+{ stdenv, fetchurl, ocaml, findlib, ocamlbuild, qtest, num }:
+
+let version = "2.10.0"; in
 
 stdenv.mkDerivation {
-  name = "ocaml-batteries-2.2.0";
+  name = "ocaml${ocaml.version}-batteries-${version}";
 
   src = fetchurl {
-    url = http://forge.ocamlcore.org/frs/download.php/1363/batteries-2.2.tar.gz;
-    sha256 = "0z4wg357fzz7cnarjsrrdnpmxw8mxcj10fp67dm3bnn0l3zkjwbs";
+    url = "https://github.com/ocaml-batteries-team/batteries-included/releases/download/v${version}/batteries-${version}.tar.gz";
+    sha256 = "08ghw87d56h1a6y1nnh3x2wy9xj25jqfk5sp6ma9nsyd37babb0h";
   };
 
-  buildInputs = [ocaml findlib camomile ounit];
+  buildInputs = [ ocaml findlib ocamlbuild qtest ];
+  propagatedBuildInputs = [ num ];
 
-  configurePhase = "true"; 	# Skip configure
+  doCheck = stdenv.lib.versions.majorMinor ocaml.version != "4.07" && !stdenv.isAarch64;
+  checkTarget = "test test";
 
   createFindlibDestdir = true;
 
@@ -22,8 +26,8 @@ stdenv.mkDerivation {
       and comprehensive development platform for the OCaml programming
       language.
     '';
-    license = stdenv.lib.licenses.lgpl21;
-    platforms = ocaml.meta.platforms;
+    license = stdenv.lib.licenses.lgpl21Plus;
+    platforms = ocaml.meta.platforms or [];
     maintainers = [
       stdenv.lib.maintainers.z77z
     ];

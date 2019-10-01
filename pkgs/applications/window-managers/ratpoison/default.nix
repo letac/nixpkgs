@@ -1,32 +1,41 @@
-{ stdenv, fetchurl, libX11, inputproto, libXt, libXpm, libXft, fontconfig, freetype
-, libXtst, xextproto, readline, libXi, pkgconfig, perl, autoconf, automake }:
+{ stdenv, fetchurl, pkgconfig, perl, autoconf, automake
+, libX11, xorgproto, libXt, libXpm, libXft, libXtst, libXi
+, libXrandr, fontconfig, freetype, readline
+}:
 
 stdenv.mkDerivation rec {
-  name = "ratpoison-1.4.6";
+  pname = "ratpoison";
+  version = "1.4.9";
 
   src = fetchurl {
-    url = "mirror://savannah/ratpoison/${name}.tar.gz";
-    sha256 = "1y1b38bng0naxfy50asshzg5xr1b2rn88mcgbds42y72d7y9d0za";
+    url = "mirror://savannah/ratpoison/${pname}-${version}.tar.xz";
+    sha256 = "1wfir1gvh5h7izgvx2kd1pr2k7wlncd33zq7qi9s9k2y0aza93yr";
   };
 
+  outputs = [ "out" "contrib" "man" "doc" "info" ];
+
+  configureFlags = [
+    # >=1.4.9 requires this even with readline in inputs
+    "--enable-history"
+  ];
+
+  nativeBuildInputs = [ pkgconfig autoconf automake ];
+
   buildInputs =
-    [ libX11 inputproto libXt libXpm libXft fontconfig freetype libXtst
-      xextproto readline libXi pkgconfig perl autoconf automake
-    ];
-
-  NIX_CFLAGS_COMPILE = "-I${freetype}/include/freetype2"; # urgh
-
-  preConfigure = "autoreconf -vf";      # needed because of the patch above
+    [ perl
+      libX11 xorgproto libXt libXpm libXft libXtst libXi libXrandr
+      fontconfig freetype readline ];
 
   postInstall = ''
-    mkdir -p $out/share/emacs/site-lisp
-    mv "$out/share/ratpoison/"*.el $out/share/emacs/site-lisp/
+    mkdir -p $contrib/{bin,share}
+    mv $out/bin/rpws $contrib/bin
+    mv $out/share/ratpoison $contrib/share
   '';
 
-  meta = {
-    homepage = "http://www.nongnu.org/ratpoison/";
-    description = "Ratpoison, a simple mouse-free tiling window manager";
-    license = "GPLv2+";
+  meta = with stdenv.lib; {
+    homepage = https://www.nongnu.org/ratpoison/;
+    description = "Simple mouse-free tiling window manager";
+    license = licenses.gpl2Plus;
 
     longDescription = ''
        Ratpoison is a simple window manager with no fat library
@@ -43,7 +52,7 @@ stdenv.mkDerivation rec {
        cripples Emacs and other quality pieces of software.
     '';
 
-    hydraPlatforms = stdenv.lib.platforms.linux;
-    maintainers = [ ];
+    platforms = platforms.unix;
+    maintainers = [ maintainers.AndersonTorres ];
   };
 }

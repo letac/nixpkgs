@@ -1,25 +1,31 @@
-{ stdenv, fetchurl, pkgconfig, glib, ncurses, mpd_clientlib, libintlOrEmpty }:
+{ stdenv, fetchFromGitHub, meson, ninja, pkgconfig, glib, ncurses
+, mpd_clientlib, gettext, boost }:
 
 stdenv.mkDerivation rec {
-  version = "0.22";
-  name = "ncmpc-${version}";
+  pname = "ncmpc";
+  version = "0.35";
 
-  src = fetchurl {
-    url = "http://www.musicpd.org/download/ncmpc/0/ncmpc-${version}.tar.xz";
-    sha256 = "a8d65f12653d9ce8bc4493aa1c5de09359c25bf3a22498d2ae797e7d41422211";
+  src = fetchFromGitHub {
+    owner  = "MusicPlayerDaemon";
+    repo   = "ncmpc";
+    rev    = "v${version}";
+    sha256 = "0hhc5snxy5fbg47ynz4b7fkmzdy974zxqr0cqc6kh15yvbr25ikh";
   };
 
-  buildInputs = [ pkgconfig glib ncurses mpd_clientlib ]
-    ++ libintlOrEmpty;
+  buildInputs = [ glib ncurses mpd_clientlib boost ];
+  nativeBuildInputs = [ meson ninja pkgconfig gettext ];
 
-  NIX_LDFLAGS = stdenv.lib.optionalString stdenv.isDarwin "-lintl";
+  mesonFlags = [
+    "-Dlirc=disabled"
+    "-Dregex=disabled"
+    "-Ddocumentation=disabled"
+  ];
 
   meta = with stdenv.lib; {
     description = "Curses-based interface for MPD (music player daemon)";
-    homepage    = http://www.musicpd.org/clients/ncmpc/;
+    homepage    = https://www.musicpd.org/clients/ncmpc/;
     license     = licenses.gpl2Plus;
-    maintainers = with maintainers; [ _1126 ];
     platforms   = platforms.all;
+    maintainers = with maintainers; [ fpletz ];
   };
 }
-

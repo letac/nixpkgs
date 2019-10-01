@@ -1,44 +1,53 @@
-{ stdenv, fetchurl, pkgconfig, gtk, girara, gettext, docutils, file, makeWrapper, zathura_icon }:
+{ stdenv, fetchurl, meson, ninja, wrapGAppsHook, pkgconfig
+, appstream-glib, desktop-file-utils, python3
+, gtk, girara, gettext, libxml2, check
+, sqlite, glib, texlive, libintl, libseccomp
+, file, librsvg
+, gtk-mac-integration
+}:
+
+with stdenv.lib;
 
 stdenv.mkDerivation rec {
-  version = "0.2.7";
-  name = "zathura-core-${version}";
+  pname = "zathura-core";
+  version = "0.4.3";
 
   src = fetchurl {
-    url = "http://pwmt.org/projects/zathura/download/zathura-${version}.tar.gz";
-    sha256 = "ef43be7705612937d095bfbe719a03503bf7e45493ea9409cb43a45cf96f0daf";
+    url = "https://pwmt.org/projects/zathura/download/zathura-${version}.tar.xz";
+    sha256 = "0hgx5x09i6d0z45llzdmh4l348fxh1y102sb1w76f2fp4r21j4ky";
   };
 
-  buildInputs = [ pkgconfig file gtk girara gettext makeWrapper ];
+  outputs = [ "bin" "man" "dev" "out" ];
 
-  # Bug in zathura build system: we should remove empty manfiles in order them
-  # to be compiled properly
-  preBuild = ''
-    rm zathura.1
-    rm zathurarc.5
-  '';
+  # Flag list:
+  # https://github.com/pwmt/zathura/blob/master/meson_options.txt
+  mesonFlags = [
+    "-Dsqlite=enabled"
+    "-Dmagic=enabled"
+    # "-Dseccomp=enabled"
+    "-Dmanpages=enabled"
+    "-Dconvert-icon=enabled"
+    "-Dsynctex=enabled"
+  ];
 
-  makeFlags = [ "PREFIX=$(out)" "RSTTOMAN=${docutils}/bin/rst2man.py" "VERBOSE=1" ];
+  nativeBuildInputs = [
+    meson ninja pkgconfig desktop-file-utils python3.pkgs.sphinx
+    gettext wrapGAppsHook libxml2 check
+  ] ++ optional stdenv.isLinux appstream-glib;
 
-  postInstall = ''
-    wrapProgram "$out/bin/zathura" \
-      --prefix PATH ":" "${file}/bin" \
-      --prefix XDG_CONFIG_DIRS ":" "$out/etc"
+  buildInputs = [
+    gtk girara libintl sqlite glib file librsvg
+    texlive.bin.core
+  ] ++ optional stdenv.isLinux libseccomp
+    ++ optional stdenv.isDarwin gtk-mac-integration;
 
-    mkdir -pv $out/etc
-    echo "set window-icon ${zathura_icon}" > $out/etc/zathurarc
-  '';
+  doCheck = true;
 
   meta = {
-    homepage = http://pwmt.org/projects/zathura/;
+    homepage = https://pwmt.org/projects/zathura/;
     description = "A core component for zathura PDF viewer";
-    license = stdenv.lib.licenses.zlib;
-    platforms = stdenv.lib.platforms.linux;
-    maintainers = [ stdenv.lib.maintainers.garbas ];
-
-    # Set lower priority in order to provide user with a wrapper script called
-    # 'zathura' instead of real zathura executable. The wrapper will build
-    # plugin path argument before executing the original.
-    priority = 1;
+    license = licenses.zlib;
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ globin ];
   };
 }

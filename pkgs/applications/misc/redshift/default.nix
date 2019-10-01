@@ -1,45 +1,93 @@
-{ fetchurl, stdenv, libX11, libXrandr, libXxf86vm, libxcb, pkgconfig, python
-, randrproto, xcbutil, xf86vidmodeproto, autoconf, automake, gettext, glib
-, GConf, dbus, dbus_glib, makeWrapper, gtk, pygtk, pyxdg, geoclue }:
+{ stdenv, fetchFromGitHub, autoconf, automake, gettext, intltool
+, libtool, pkgconfig, wrapGAppsHook, wrapPython, gobject-introspection
+, gtk3, python, pygobject3, hicolor-icon-theme, pyxdg
+
+, withQuartz ? stdenv.isDarwin, ApplicationServices
+, withRandr ? stdenv.isLinux, libxcb
+, withDrm ? stdenv.isLinux, libdrm
+
+, withGeolocation ? true
+, withCoreLocation ? withGeolocation && stdenv.isDarwin, CoreLocation, Foundation, Cocoa
+, withGeoclue ? withGeolocation && stdenv.isLinux, geoclue
+}:
 
 stdenv.mkDerivation rec {
-  version = "1.8";
-  name = "redshift-${version}";
-  src = fetchurl {
-    url = "https://github.com/jonls/redshift/archive/v${version}.tar.gz";
-    sha256 = "1srj2dwy32h71iqikb4ysv5ipclym80i9lys2ns8vjmclg7hj3vi";
+  pname = "redshift";
+  version = "1.12";
+
+  src = fetchFromGitHub {
+    owner = "jonls";
+    repo = "redshift";
+    rev = "v${version}";
+    sha256 = "12cb4gaqkybp4bkkns8pam378izr2mwhr2iy04wkprs2v92j7bz6";
   };
 
-  buildInputs = [
-    libX11 libXrandr libXxf86vm libxcb pkgconfig python randrproto xcbutil
-    xf86vidmodeproto autoconf automake gettext glib GConf dbus dbus_glib
-    makeWrapper gtk pygtk pyxdg geoclue
+  patches = [
+    # https://github.com/jonls/redshift/pull/575
+    ./575.patch
   ];
 
-  preConfigure = ''
-    ./bootstrap
-  '';
+  nativeBuildInputs = [
+    autoconf
+    automake
+    gettext
+    intltool
+    libtool
+    pkgconfig
+    wrapGAppsHook
+    wrapPython
+  ];
 
-  preInstall = ''
-    substituteInPlace src/redshift-gtk/redshift-gtk python --replace "/usr/bin/env python" "${python}/bin/${python.executable}"
-  '';
+  configureFlags = [
+    "--enable-randr=${if withRandr then "yes" else "no"}"
+    "--enable-geoclue2=${if withGeoclue then "yes" else "no"}"
+    "--enable-drm=${if withDrm then "yes" else "no"}"
+    "--enable-quartz=${if withQuartz then "yes" else "no"}"
+    "--enable-corelocation=${if withCoreLocation then "yes" else "no"}"
+  ];
 
+  buildInputs = [
+    gobject-introspection
+    gtk3
+    python
+    hicolor-icon-theme
+  ] ++ stdenv.lib.optional  withRandr        libxcb
+    ++ stdenv.lib.optional  withGeoclue      geoclue
+    ++ stdenv.lib.optional  withDrm          libdrm
+    ++ stdenv.lib.optional  withQuartz       ApplicationServices
+    ++ stdenv.lib.optionals withCoreLocation [ CoreLocation Foundation Cocoa ]
+    ;
+
+  pythonPath = [ pygobject3 pyxdg ];
+
+  preConfigure = "./bootstrap";
+
+  postFixup = "wrapPythonPrograms";
+
+  # the geoclue agent may inspect these paths and expect them to be
+  # valid without having the correct $PATH set
   postInstall = ''
-    wrapProgram "$out/bin/redshift-gtk" --prefix PYTHONPATH : $PYTHONPATH:${pygtk}/lib/${python.libPrefix}/site-packages/gtk-2.0:${pyxdg}/lib/${python.libPrefix}/site-packages/pyxdg:$out/lib/${python.libPrefix}/site-packages
+    substituteInPlace $out/share/applications/redshift.desktop \
+      --replace 'Exec=redshift' "Exec=$out/bin/redshift"
+    substituteInPlace $out/share/applications/redshift.desktop \
+      --replace 'Exec=redshift-gtk' "Exec=$out/bin/redshift-gtk"
   '';
+
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
-    description = "changes the color temperature of your screen gradually";
+    description = "Screen color temperature manager";
     longDescription = ''
-      The color temperature is set according to the position of the
-      sun. A different color temperature is set during night and
-      daytime. During twilight and early morning, the color
-      temperature transitions smoothly from night to daytime
-      temperature to allow your eyes to slowly adapt.
-      '';
-    license = "GPLv3+";
-    homepage = "http://jonls.dk/redshift";
-    platforms = platforms.linux;
-    maintainers = maintainers.mornfall;
-  }; 
+      Redshift adjusts the color temperature according to the position
+      of the sun. A different color temperature is set during night and
+      daytime. During twilight and early morning, the color temperature
+      transitions smoothly from night to daytime temperature to allow
+      your eyes to slowly adapt. At night the color temperature should
+      be set to match the lamps in your room.
+    '';
+    license = licenses.gpl3Plus;
+    homepage = http://jonls.dk/redshift;
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ yegortimoshenko globin ];
+  };
 }

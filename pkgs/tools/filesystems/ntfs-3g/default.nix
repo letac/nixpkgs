@@ -2,16 +2,17 @@
 , crypto ? false, libgcrypt, gnutls, pkgconfig}:
 
 stdenv.mkDerivation rec {
-  pname = "ntfs-3g";
-  version = "2012.1.15";
-  name = "${pname}-${version}";
+  pname = "ntfs3g";
+  version = "2017.3.23";
 
-  buildInputs = [libuuid] ++ stdenv.lib.optionals crypto [gnutls libgcrypt];
+  outputs = [ "out" "dev" "man" "doc" ];
+
+  buildInputs = [ libuuid ] ++ stdenv.lib.optionals crypto [ gnutls libgcrypt ];
   nativeBuildInputs = stdenv.lib.optional crypto pkgconfig;
 
   src = fetchurl {
-    url = "http://tuxera.com/opensource/ntfs-3g_ntfsprogs-${version}.tgz";
-    sha256 = "09gvfgvqm4dswzxmwvg3r23bv39cp8y8b6qs2jcwmrqd032i25kg";
+    url = "https://tuxera.com/opensource/ntfs-3g_ntfsprogs-${version}.tgz";
+    sha256 = "1mb228p80hv97pgk3myyvgp975r9mxq56c6bdn1n24kngcfh4niy";
   };
 
   patchPhase = ''
@@ -22,11 +23,14 @@ stdenv.mkDerivation rec {
       --replace /bin/umount ${utillinux}/bin/umount
   '';
 
-  configureFlags =
-    ''
-      --disable-ldconfig --exec-prefix=''${prefix} --enable-mount-helper
-      --enable-posix-acls --enable-xattr-mappings --${if crypto then "enable" else "disable"}-crypto
-    '';
+  configureFlags = [
+    "--disable-ldconfig"
+    "--exec-prefix=\${prefix}"
+    "--enable-mount-helper"
+    "--enable-posix-acls"
+    "--enable-xattr-mappings"
+    "--${if crypto then "enable" else "disable"}-crypto"
+  ];
 
   postInstall =
     ''
@@ -34,10 +38,11 @@ stdenv.mkDerivation rec {
       ln -sv mount.ntfs-3g $out/sbin/mount.ntfs
     '';
 
-  meta = {
-    homepage = http://www.tuxera.com/community/;
-    description = "FUSE-base NTFS driver with full write support";
-    maintainers = [ stdenv.lib.maintainers.urkud ];
-    platforms = stdenv.lib.platforms.linux;
+  meta = with stdenv.lib; {
+    homepage = https://www.tuxera.com/community/open-source-ntfs-3g/;
+    description = "FUSE-based NTFS driver with full write support";
+    maintainers = with maintainers; [ dezgeg ];
+    platforms = platforms.linux;
+    license = licenses.gpl2Plus; # and (lib)fuse-lite under LGPL2+
   };
 }

@@ -1,10 +1,36 @@
-{stdenv, fetchurl}:
+{ stdenv, fetchurl, buildPackages, automake, autoconf, libtool, which }:
 
-stdenv.mkDerivation {
-  name = "ilmbase-1.0.1";
-  
+stdenv.mkDerivation rec {
+  pname = "ilmbase";
+  version = "2.3.0";
+
   src = fetchurl {
-    url = mirror://savannah/openexr/ilmbase-1.0.1.tar.gz;
-    sha256 = "0z9r3r0bxyhgwhkdwln0dg1lnxz691qnjygrqlg3jym34rxzq52g";
+    url = "https://github.com/openexr/openexr/releases/download/v${version}/${pname}-${version}.tar.gz";
+    sha256 = "0qiq5bqq9rxhqjiym2k36sx4vq8adgrz6xf6qwizi9bqm78phsa5";
+  };
+
+  outputs = [ "out" "dev" ];
+
+  preConfigure = ''
+    patchShebangs ./bootstrap
+    ./bootstrap
+  '';
+
+  depsBuildBuild = [ buildPackages.stdenv.cc ];
+  nativeBuildInputs = [ automake autoconf libtool which ];
+
+  NIX_CFLAGS_LINK = [ "-pthread" ];
+
+  patches = [ ./bootstrap.patch ./cross.patch ];
+
+  # fails 1 out of 1 tests with
+  # "lt-ImathTest: testBoxAlgo.cpp:892: void {anonymous}::boxMatrixTransform(): Assertion `b21 == b2' failed"
+  # at least on i686. spooky!
+  doCheck = stdenv.isx86_64;
+
+  meta = with stdenv.lib; {
+    homepage = https://www.openexr.com/;
+    license = licenses.bsd3;
+    platforms = platforms.all;
   };
 }

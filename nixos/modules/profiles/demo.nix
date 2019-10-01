@@ -1,16 +1,19 @@
-{ config, pkgs, ... }:
+{ ... }:
 
 {
   imports = [ ./graphical.nix ];
 
-  users.extraUsers.demo =
-    { description = "Demo user account";
-      group = "users";
+  users.users.demo =
+    { isNormalUser = true;
+      description = "Demo user account";
       extraGroups = [ "wheel" ];
-      home = "/home/demo";
-      createHome = true;
-      useDefaultShell = true;
       password = "demo";
       uid = 1000;
     };
+
+  services.xserver.displayManager.sddm.autoLogin = {
+    enable = true;
+    relogin = true;
+    user = "demo";
+  };
 }

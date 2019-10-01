@@ -1,75 +1,91 @@
-{ stdenv, fetchurl, pkgconfig, glib, expat, pam, intltool, spidermonkey
-, gobjectIntrospection, libxslt, docbook_xsl
-, useSystemd ? stdenv.isLinux, systemd }:
+{ stdenv, fetchurl, pkgconfig, glib, expat, pam, perl
+, intltool, spidermonkey_60 , gobject-introspection, libxslt, docbook_xsl, dbus
+, docbook_xml_dtd_412, gtk-doc, coreutils
+, useSystemd ? stdenv.isLinux, systemd
+, withGnome ? true
+, doCheck ? stdenv.isLinux
+}:
 
 let
 
-  system = "/var/run/current-system/sw";
-  setuid = "/var/setuid-wrappers"; #TODO: from <nixos> config.security.wrapperDir;
-
-  foolVars = {
-    SYSCONF = "/etc";
-    DATA = "${system}/share"; # to find share/polkit-1/actions of other apps at runtime
-  };
+  system = "/run/current-system/sw";
+  setuid = "/run/wrappers/bin"; #TODO: from <nixos> config.security.wrapperDir;
 
 in
 
 stdenv.mkDerivation rec {
-  name = "polkit-0.112";
+  pname = "polkit";
+  version = "0.116";
 
   src = fetchurl {
-    url = "http://www.freedesktop.org/software/polkit/releases/${name}.tar.gz";
-    sha256 = "1xkary7yirdcjdva950nqyhmsz48qhrdsr78zciahj27p8yg95fn";
+    url = "https://www.freedesktop.org/software/${pname}/releases/${pname}-${version}.tar.gz";
+    sha256 = "1c9lbpndh5zis22f154vjrhnqw65z8s85nrgl42v738yf6g0q5w8";
   };
 
-  buildInputs =
-    [ pkgconfig glib expat pam intltool spidermonkey gobjectIntrospection ]
-    ++ [ libxslt docbook_xsl ] # man pages
-    ++ stdenv.lib.optional useSystemd systemd;
+  postPatch = stdenv.lib.optionalString stdenv.isDarwin ''
+    sed -i -e "s/-Wl,--as-needed//" configure.ac
+  '';
 
-  # Ugly hack to overwrite hardcoded directories
-  # TODO: investigate a proper patch which will be accepted upstream
-  # After update it's good to check the sources via:
-  #   grep '\<PACKAGE_' '--include=*.[ch]' -R
-  CFLAGS = stdenv.lib.concatStringsSep " "
-    ( map (var: ''-DPACKAGE_${var}_DIR=\""${builtins.getAttr var foolVars}"\"'')
-        (builtins.attrNames foolVars) );
+  outputs = [ "bin" "dev" "out" ]; # small man pages in $bin
+
+  nativeBuildInputs =
+    [ glib gtk-doc pkgconfig intltool perl ]
+    ++ [ libxslt docbook_xsl docbook_xml_dtd_412 ]; # man pages
+  buildInputs =
+    [ glib expat pam spidermonkey_60 ]
+    ++ stdenv.lib.optional useSystemd systemd
+    ++ stdenv.lib.optional withGnome gobject-introspection;
+
+  NIX_CFLAGS_COMPILE = " -Wno-deprecated-declarations "; # for polkit 0.114 and glib 2.56
 
   preConfigure = ''
+    chmod +x test/mocklibc/bin/mocklibc{,-test}.in
     patchShebangs .
-  '' + stdenv.lib.optionalString useSystemd /* bogus chroot detection */ ''
-    sed '/libsystemd-login autoconfigured, but system does not appear to use systemd/s/.*/:/' -i configure
-  ''
+
     # ‘libpolkit-agent-1.so’ should call the setuid wrapper on
     # NixOS.  Hard-coding the path is kinda ugly.  Maybe we can just
     # call through $PATH, but that might have security implications.
-  + ''
     substituteInPlace src/polkitagent/polkitagentsession.c \
       --replace   'PACKAGE_PREFIX "/lib/polkit-1/'   '"${setuid}/'
+    substituteInPlace test/data/etc/polkit-1/rules.d/10-testing.rules \
+      --replace   /bin/true ${coreutils}/bin/true \
+      --replace   /bin/false ${coreutils}/bin/false
+
+  '' + stdenv.lib.optionalString useSystemd /* bogus chroot detection */ ''
+    sed '/libsystemd autoconfigured/s/.*/:/' -i configure
   '';
 
   configureFlags = [
-    #"--libexecdir=$(out)/libexec/polkit-1" # this and localstatedir are ignored by configure
-    "--with-systemdsystemunitdir=$(out)/etc/systemd/system"
+    "--datadir=${system}/share"
+    "--sysconfdir=/etc"
+    "--with-systemdsystemunitdir=${placeholder "out"}/etc/systemd/system"
     "--with-polkitd-user=polkituser" #TODO? <nixos> config.ids.uids.polkituser
     "--with-os-type=NixOS" # not recognized but prevents impurities on non-NixOS
-    "--enable-introspection"
+    (if withGnome then "--enable-introspection" else "--disable-introspection")
+  ] ++ stdenv.lib.optional (!doCheck) "--disable-test";
+
+  makeFlags = [
+    "INTROSPECTION_GIRDIR=${placeholder "out"}/share/gir-1.0"
+    "INTROSPECTION_TYPELIBDIR=${placeholder "out"}/lib/girepository-1.0"
   ];
 
-  makeFlags = "INTROSPECTION_GIRDIR=$(out)/share/gir-1.0 INTROSPECTION_TYPELIBDIR=$(out)/lib/girepository-1.0";
+  installFlags = [
+    "datadir=${placeholder "out"}/share"
+    "sysconfdir=${placeholder "out"}/etc"
+  ];
 
-  # The following is required on grsecurity/PaX due to spidermonkey's JIT
-  postBuild = ''
-    paxmark mr src/polkitbackend/.libs/polkitd
-    paxmark mr test/polkitbackend/.libs/polkitbackendjsauthoritytest
+  inherit doCheck;
+  checkInputs = [dbus];
+  checkPhase = ''
+    # tests need access to the system bus
+    dbus-run-session --config-file=${./system_bus.conf} -- sh -c 'DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS make check'
   '';
-
-  #doCheck = true; # some /bin/bash problem that isn't auto-solved by patchShebangs
 
   meta = with stdenv.lib; {
     homepage = http://www.freedesktop.org/wiki/Software/polkit;
     description = "A toolkit for defining and handling the policy that allows unprivileged processes to speak to privileged processes";
-    platforms = platforms.linux;
-    maintainers = [ maintainers.urkud ];
+    license = licenses.gpl2;
+    platforms = platforms.unix;
+    maintainers = [ ];
   };
 }

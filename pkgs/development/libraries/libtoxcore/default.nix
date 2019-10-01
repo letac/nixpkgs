@@ -1,36 +1,55 @@
-{ stdenv, fetchurl, autoconf, libtool, automake, libsodium, ncurses
-, libconfig, pkgconfig }:
+{ stdenv, fetchFromGitHub, cmake, libsodium, ncurses, libopus, msgpack
+, libvpx, check, libconfig, pkgconfig }:
 
 let
-  version = "388b1229b";
-  date = "20140220";
-in
-stdenv.mkDerivation rec {
-  name = "tox-core-${date}-${version}";
+  generic = { version, sha256 }:
+  stdenv.mkDerivation {
+    pname = "libtoxcore";
+    inherit version;
 
-  src = fetchurl {
-    url = "https://github.com/irungentoo/ProjectTox-Core/tarball/${version}";
-    name = "${name}.tar.gz";
-    sha256 = "12vggiv0gyv8a2rd5qrv04b7yhfhxb7r0yh75gg5n4jdpcbhvgsd";
+    src = fetchFromGitHub {
+      owner  = "TokTok";
+      repo   = "c-toxcore";
+      rev    = "v${version}";
+      inherit sha256;
+    };
+
+    cmakeFlags = [
+      "-DBUILD_NTOX=ON"
+      "-DDHT_BOOTSTRAP=ON"
+      "-DBOOTSTRAP_DAEMON=ON"
+    ];
+
+    buildInputs = [
+      libsodium msgpack ncurses libconfig
+    ] ++ stdenv.lib.optionals (!stdenv.isAarch32) [
+      libopus libvpx
+    ];
+
+    nativeBuildInputs = [ cmake pkgconfig ];
+
+    enableParallelBuilding = true;
+
+    doCheck = false; # hangs, tries to access the net?
+    checkInputs = [ check ];
+
+    meta = with stdenv.lib; {
+      description = "P2P FOSS instant messaging application aimed to replace Skype";
+      homepage = https://tox.chat;
+      license = licenses.gpl3Plus;
+      maintainers = with maintainers; [ peterhoeg ];
+      platforms = platforms.all;
+    };
   };
 
-  preConfigure = ''
-    autoreconf -i
-  '';
+in {
+  libtoxcore_0_1 = generic {
+    version = "0.1.11";
+    sha256 = "1fya5gfiwlpk6fxhalv95n945ymvp2iidiyksrjw1xw95fzsp1ij";
+  };
 
-  configureFlags = [ "--with-libsodium-headers=${libsodium}/include"
-    "--with-libsodium-libs=${libsodium}/lib" 
-    "--enable-ntox" ];
-
-  buildInputs = [ autoconf libtool automake libsodium ncurses libconfig
-    pkgconfig ];
-
-  doCheck = true;
-
-  meta = {
-    description = "P2P FOSS instant messaging application aimed to replace Skype with crypto";
-    license = "GPLv3+";
-    maintainers = with stdenv.lib.maintainers; [ viric ];
-    platforms = stdenv.lib.platforms.all;
+  libtoxcore_0_2 = generic {
+    version = "0.2.10";
+    sha256 = "0r5j2s5n8ikayvr1zylvv3ai3smbhm2m0yhpa9lfcsxhvyn9phcn";
   };
 }

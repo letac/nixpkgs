@@ -1,7 +1,7 @@
 { stdenv, fetchsvn, autoconf, automake }:
 
 stdenv.mkDerivation rec {
-  name = "spawn-fcgi-${version}";
+  pname = "spawn-fcgi";
   version = "1.6.4";
 
   src = fetchsvn {
@@ -20,5 +20,6 @@ stdenv.mkDerivation rec {
     description = "Provides an interface to external programs that support the FastCGI interface";
     license     = licenses.bsd3;
     maintainers = with maintainers; [ cstrahan ];
+    platforms = with platforms; unix;
   };
 }

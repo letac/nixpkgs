@@ -41,8 +41,11 @@ stdenv.mkDerivation rec {
       Development Environment), and COGRE (COnnected GRaph Editor).
     '';
 
-    license = "GPLv2+";
+    license = stdenv.lib.licenses.gpl2Plus;
 
     homepage = http://cedet.sourceforge.net/;
+
+    # Fails with `semantic-idle.el:42:1:Error: Invalid function: class-p`
+    broken = true;
   };
 }

@@ -1,18 +1,20 @@
 { stdenv, fetchurl }:
 stdenv.mkDerivation rec {
-  version = "1.9";
-  name = "beanstalkd-${version}";
+  version = "1.11";
+  pname = "beanstalkd";
 
   installPhase=''make install "PREFIX=$out"'';
 
   src = fetchurl {
     url = "https://github.com/kr/beanstalkd/archive/v${version}.tar.gz";
-    sha256 = "158e6d6090c0afac7ee17b9f22713506b3e870dc04a738517282e2e262afb9eb";
+    sha256 = "0i65d0pln1p6wxghzwziz2k8vafvdgjq6yc962ayzs80kpj18d2y";
   };
+
+  hardeningDisable = [ "fortify" ];
 
   meta = with stdenv.lib; {
     homepage = http://kr.github.io/beanstalkd/;
-    description = "Beanstalk is a simple, fast work queue.";
+    description = "A simple, fast work queue";
     license = licenses.mit;
     maintainers = [ maintainers.zimbatm ];
     platforms = platforms.all;

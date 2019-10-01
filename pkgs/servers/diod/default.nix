@@ -1,19 +1,26 @@
-{ stdenv, fetchurl, munge, lua5, libcap, perl, ncurses }:
+{ stdenv, fetchurl, munge, lua,
+  libcap, perl, ncurses
+}:
 
 stdenv.mkDerivation rec {
-  name = "diod-${version}";
-  version = "1.0.21";
+  pname = "diod";
+  version = "1.0.24";
 
   src = fetchurl {
-    url = "https://github.com/chaos/diod/archive/${version}.tar.gz";
-    sha256 = "1864i42a4rm3f1q68nc19kcshc0hcf6zfgsdq0ppmmwry4mrvij0";
+    url = "https://github.com/chaos/diod/releases/download/${version}/${pname}-${version}.tar.gz";
+    sha256 = "17wckwfsqj61yixz53nwkc35z66arb1x3napahpi64m7q68jn7gl";
   };
 
-  buildInputs = [ munge lua5 libcap perl ncurses ];
+  postPatch = ''
+    substituteInPlace diod/xattr.c --replace attr/xattr.h sys/xattr.h
+  '';
 
-  meta = {
+  buildInputs = [ munge lua libcap perl ncurses ];
+
+  meta = with stdenv.lib; {
     description = "An I/O forwarding server that implements a variant of the 9P protocol";
-    maintainers = [ stdenv.lib.maintainers.rickynils];
-    platforms = stdenv.lib.platforms.linux;
+    maintainers = with maintainers; [ rnhmjoj ];
+    platforms   = platforms.linux;
+    license     = licenses.gpl2Plus;
   };
 }

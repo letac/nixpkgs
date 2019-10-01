@@ -1,37 +1,69 @@
-{ stdenv, fetchurl, pkgconfig, udev, utillinux, coreutils }:
+{ stdenv, fetchgit, fetchpatch, pkgconfig, systemd, udev, utillinux, libuuid
+, thin-provisioning-tools, libaio
+, enable_dmeventd ? false }:
 
 let
-  v = "2.02.106";
+  version = "2.03.01";
 in
 
 stdenv.mkDerivation {
-  name = "lvm2-${v}";
+  pname = "lvm2";
+  inherit version;
 
-  src = fetchurl {
-    url = "ftp://sources.redhat.com/pub/lvm2/releases/LVM2.${v}.tgz";
-    sha256 = "0nr833bl0q4zq52drjxmmpf7bs6kqxwa5kahwwxm9411khkxz0vc";
+  src = fetchgit {
+    url = "git://sourceware.org/git/lvm2.git";
+    rev = "v${builtins.replaceStrings [ "." ] [ "_" ] version}";
+    sha256 = "0jlaswf1srdxiqpgpp97j950ddjds8z0kr4pbwmal2za2blrgvbl";
   };
 
-  configureFlags =
-    "--disable-readline --enable-udev_rules --enable-udev_sync --enable-pkgconfig --enable-applib";
+  configureFlags = [
+    "--disable-readline"
+    "--enable-udev_rules"
+    "--enable-udev_sync"
+    "--enable-pkgconfig"
+    "--enable-applib"
+    "--enable-cmdlib"
+  ] ++ stdenv.lib.optional enable_dmeventd " --enable-dmeventd"
+  ++ stdenv.lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+    "ac_cv_func_malloc_0_nonnull=yes"
+    "ac_cv_func_realloc_0_nonnull=yes"
+  ];
 
-  buildInputs = [ pkgconfig udev ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ udev libuuid thin-provisioning-tools libaio ];
 
   preConfigure =
     ''
-      substituteInPlace scripts/lvmdump.sh \
-        --replace /usr/bin/tr ${coreutils}/bin/tr
       substituteInPlace scripts/lvm2_activation_generator_systemd_red_hat.c \
-        --replace /usr/sbin/lvm $out/sbin/lvm \
-        --replace /usr/bin/udevadm ${udev}/bin/udevadm
+        --replace /usr/bin/udevadm ${systemd}/bin/udevadm
 
       sed -i /DEFAULT_SYS_DIR/d Makefile.in
       sed -i /DEFAULT_PROFILE_DIR/d conf/Makefile.in
     '';
 
-  enableParallelBuilding = true;
+  # gcc: error: ../../device_mapper/libdevice-mapper.a: No such file or directory
+  enableParallelBuilding = false;
 
   #patches = [ ./purity.patch ];
+  patches = stdenv.lib.optionals stdenv.hostPlatform.isMusl [
+    (fetchpatch {
+      name = "fix-stdio-usage.patch";
+      url = "https://git.alpinelinux.org/cgit/aports/plain/main/lvm2/fix-stdio-usage.patch?h=3.7-stable&id=31bd4a8c2dc00ae79a821f6fe0ad2f23e1534f50";
+      sha256 = "0m6wr6qrvxqi2d2h054cnv974jq1v65lqxy05g1znz946ga73k3p";
+    })
+    (fetchpatch {
+      name = "mallinfo.patch";
+      url = "https://git.alpinelinux.org/cgit/aports/plain/main/lvm2/mallinfo.patch?h=3.7-stable&id=31bd4a8c2dc00ae79a821f6fe0ad2f23e1534f50";
+      sha256 = "0g6wlqi215i5s30bnbkn8w7axrs27y3bnygbpbnf64wwx7rxxlj0";
+    })
+    (fetchpatch {
+      name = "mlockall-default-config.patch";
+      url = "https://git.alpinelinux.org/cgit/aports/plain/main/lvm2/mlockall-default-config.patch?h=3.7-stable&id=31bd4a8c2dc00ae79a821f6fe0ad2f23e1534f50";
+      sha256 = "1ivbj3sphgf8n1ykfiv5rbw7s8dgnj5jcr9jl2v8cwf28lkacw5l";
+    })
+  ];
+
+  doCheck = false; # requires root
 
   # To prevent make install from failing.
   preInstall = "installFlags=\"OWNER= GROUP= confdir=$out/etc\"";
@@ -50,9 +82,13 @@ stdenv.mkDerivation {
       cp scripts/lvm2_activation_generator_systemd_red_hat $out/lib/systemd/system-generators
     '';
 
-  meta = {
+  meta = with stdenv.lib; {
     homepage = http://sourceware.org/lvm2/;
-    descriptions = "Tools to support Logical Volume Management (LVM) on Linux";
-    platforms = stdenv.lib.platforms.linux;
+    description = "Tools to support Logical Volume Management (LVM) on Linux";
+    platforms = platforms.linux;
+    license = with licenses; [ gpl2 bsd2 lgpl21 ];
+    maintainers = with maintainers; [raskin];
+    inherit version;
+    downloadPage = "ftp://sources.redhat.com/pub/lvm2/";
   };
 }

@@ -1,20 +1,25 @@
-{stdenv, fetchurl, pkgconfig, gettext, perl, perlXMLParser, intltool
+{stdenv, fetchurl, pkgconfig, gettext, perlPackages, intltool
 , libxml2, glib}:
 
-stdenv.mkDerivation rec {
-  name = "shared-mime-info-1.2";
+let version = "1.12"; in
+stdenv.mkDerivation {
+  pname = "shared-mime-info";
+  inherit version;
 
   src = fetchurl {
-    url = "http://freedesktop.org/~hadess/${name}.tar.xz";
-    sha256 = "0y5vi0vr6rbhvfzcfg57cfskn362bpvcpca9cy598nmr87i6lld5";
+    url = "https://gitlab.freedesktop.org/xdg/shared-mime-info/uploads/80c7f1afbcad2769f38aeb9ba6317a51/shared-mime-info-1.12.tar.xz";
+    sha256 = "0gj0pp36qpsr9w6v4nywnjpcisadwkndapqsjn0ny3gd0zzg1chq";
   };
 
-  buildInputs = [
-    pkgconfig gettext intltool perl perlXMLParser libxml2 glib
-  ];
+  nativeBuildInputs = [ pkgconfig gettext intltool ] ++ (with perlPackages; [ perl XMLParser ]);
+  buildInputs = [ libxml2 glib ];
 
-  meta = {
+  meta = with stdenv.lib; {
+    inherit version;
     description = "A database of common MIME types";
     homepage = http://freedesktop.org/wiki/Software/shared-mime-info;
+    license = licenses.gpl2Plus;
+    platforms = platforms.unix;
+    maintainers = [ maintainers.mimame ];
   };
 }

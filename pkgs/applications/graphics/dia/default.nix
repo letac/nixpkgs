@@ -1,50 +1,39 @@
-{stdenv, fetchurl, fetchurlGnome, gtk, pkgconfig, perl, perlXMLParser, libxml2, gettext
-, python, libxml2Python, docbook5, docbook_xsl, libxslt, intltool, libart_lgpl
-, withGNOME ? false, libgnomeui }:
+{ stdenv, fetchgit, autoconf, automake, libtool, gtk2, pkgconfig, perlPackages,
+libxml2, gettext, python, libxml2Python, docbook5, docbook_xsl,
+libxslt, intltool, libart_lgpl, withGNOME ? false, libgnomeui, hicolor-icon-theme,
+gtk-mac-integration-gtk2 }:
 
-stdenv.mkDerivation rec {
-  name = src.pkgname;
+stdenv.mkDerivation {
+  pname = "dia";
+  version = "0.97.3.20170622";
 
-  src = fetchurlGnome {
-    project = "dia";
-    major = "0"; minor = "97"; patchlevel = "2"; extension = "xz";
-    sha256 = "1qgawm7rrf4wd1yc0fp39ywv8gbz4ry1s16k00dzg5w6p67lfqd7";
-  };
-
-  correctPersistence = fetchurl {
-    url = https://launchpadlibrarian.net/132677658/persistence;
-    sha256 = "1rv6zv9i03bna4bdp1wzn72lg7kdwi900y1izdq0imibi54nxjsk";
+  src = fetchgit {
+    url = https://gitlab.gnome.org/GNOME/dia.git;
+    rev = "b86085dfe2b048a2d37d587adf8ceba6fb8bc43c";
+    sha256 = "1fyxfrzdcs6blxhkw3bcgkksaf3byrsj4cbyrqgb4869k3ynap96";
   };
 
   buildInputs =
-    [ gtk perlXMLParser libxml2 gettext python libxml2Python docbook5
-      libxslt docbook_xsl libart_lgpl
-    ] ++ stdenv.lib.optional withGNOME libgnomeui;
+    [ gtk2 libxml2 gettext python libxml2Python docbook5
+      libxslt docbook_xsl libart_lgpl hicolor-icon-theme ]
+      ++ stdenv.lib.optional withGNOME libgnomeui
+      ++ stdenv.lib.optional stdenv.isDarwin gtk-mac-integration-gtk2;
 
-  nativeBuildInputs = [ pkgconfig intltool perl ];
+  nativeBuildInputs = [ autoconf automake libtool pkgconfig intltool ]
+    ++ (with perlPackages; [ perl XMLParser ]);
 
-  configureFlags = stdenv.lib.optionalString withGNOME "--enable-gnome";
-
-  patches = [ ./glib-top-level-header.patch ];
-
-  # This file should normally require a gtk-update-icon-cache -q /usr/share/icons/hicolor command
-  # It have no reasons to exist in a redistribuable package
-  postInstall = ''
-    rm $out/share/icons/hicolor/icon-theme.cache
-
-    cd "$out"/bin/
-    mv dia .dia-wrapped
-    echo '#! ${stdenv.shell}' >> dia
-    echo 'test -f "$HOME/.dia/persistence" || cp ${correctPersistence} "$HOME/.dia/persistence" ' >> dia
-    echo 'chmod u+rw "$HOME/.dia/persistence" ' >> dia
-    echo "\"$out/bin/"'.dia-wrapped" "$@"' >> dia
-    chmod a+x dia
+  preConfigure = ''
+    NOCONFIGURE=1 ./autogen.sh # autoreconfHook is not enough
   '';
+  configureFlags = stdenv.lib.optional withGNOME "--enable-gnome";
 
-  meta = {
+  hardeningDisable = [ "format" ];
+
+  meta = with stdenv.lib; {
     description = "Gnome Diagram drawing software";
     homepage = http://live.gnome.org/Dia;
-    maintainers = with stdenv.lib.maintainers; [raskin urkud];
-    platforms = stdenv.lib.platforms.linux;
+    maintainers = with maintainers; [ raskin ];
+    license = licenses.gpl2;
+    platforms = platforms.unix;
   };
 }

@@ -1,19 +1,27 @@
-{stdenv, fetchurl, flex, bison, libpcap}:
+{stdenv, fetchurl, flex, bison, libpcap, libdnet, libnfnetlink, libnetfilter_queue}:
 
 stdenv.mkDerivation rec {
-  name = "daq-2.0.0";
-  
+  name = "daq-2.2.2";
+
   src = fetchurl {
     name = "${name}.tar.gz";
-    url = http://www.snort.org/downloads/2311;
-    sha256 = "0f0w5jfmx0n2sms4f2mfg984a27r7qh927vkd7fclvx9cbiwibzv";
+    url = "https://snort.org/downloads/archive/snort/${name}.tar.gz";
+    sha256 = "0yvzscy7vqj7s5rccza0f7p6awghfm3yaxihx1h57lqspg51in3w";
   };
-  
-  buildInputs = [ flex bison libpcap ];
-  
+
+  buildInputs = [ flex bison libpcap libdnet libnfnetlink libnetfilter_queue];
+
+  configureFlags = [
+    "--enable-nfq-module=yes"
+    "--with-dnet-includes=${libdnet}/includes"
+    "--with-dnet-libraries=${libdnet}/lib"
+  ];
+
   meta = {
     description = "Data AcQuisition library (DAQ), for packet I/O";
-    homepage = http://www.snort.org;
-    license = "GPLv2";
+    homepage = https://www.snort.org;
+    maintainers = with stdenv.lib.maintainers; [ aycanirican ];
+    license = stdenv.lib.licenses.gpl2;
+    platforms = with stdenv.lib.platforms; linux;
   };
 }
